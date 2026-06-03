@@ -41,7 +41,7 @@ export default function AboutPage() {
         {/* Atmospheric background */}
         <div className="absolute right-0 top-0 w-1/2 h-full opacity-[0.07] pointer-events-none">
           <Image
-            src="/images/treadmill.jpg"
+            src="/images/jermaine-headshot.jpg"
             alt=""
             fill
             className="object-cover object-left"

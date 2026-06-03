@@ -91,7 +91,7 @@ export default function HomePage() {
       {/* ── HERO ─────────────────────────────────────────── */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
         <Image
-          src="/images/lifting.jpg"
+          src="/images/jermaine-physique.jpg"
           alt=""
           fill
           priority
