@@ -1,195 +1,243 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
+import Image from "next/image";
+
+type Status = "idle" | "submitting" | "success" | "error";
+
+const nextSteps = [
+  {
+    num: "01",
+    title: "We review your application",
+    body: "Every application is read personally — usually within 48 hours.",
+  },
+  {
+    num: "02",
+    title: "We reach out to schedule a call",
+    body: "If it's a strong fit, we'll invite you to a 20-minute strategy call.",
+  },
+  {
+    num: "03",
+    title: "Your program is built",
+    body: "After the call, your custom program is ready before you start day one.",
+  },
+];
 
 export default function ApplyPage() {
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState<Status>("idle");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-
-    const formEl = e.currentTarget; // ✅ capture immediately (fixes reset() null issue)
-    setStatus("Submitting...");
-
-    const formData = new FormData(formEl);
+    const formEl = e.currentTarget;
+    setStatus("submitting");
 
     try {
       const res = await fetch(
         "https://script.google.com/macros/s/AKfycbxf3VInd_v9ZJpIedP0fImdFedh-1xi9oBPA7dRKMATwLupMLdy41OmrRFwnIzYVqXd5w/exec",
-        {
-          method: "POST",
-          body: formData,
-        }
+        { method: "POST", body: new FormData(formEl) }
       );
+      const data = await res.json().catch(() => ({}) as Record<string, unknown>);
+      if (!res.ok || (data as { status?: string }).status !== "success") throw new Error();
 
-      const data = await res.json().catch(() => ({} as any));
-      if (!res.ok || data.status !== "success") {
-        throw new Error(data.message || "Submission failed");
-      }
-
-      setStatus("Application submitted! Redirecting...");
-      formEl.reset(); // ✅ use captured reference
-
+      setStatus("success");
+      formEl.reset();
       setTimeout(() => {
         window.location.href = "/thank-you";
       }, 500);
-    } catch (err) {
-      console.error("Submission error:", err);
-      setStatus("Something went wrong. Please try again.");
+    } catch {
+      setStatus("error");
     }
   }
 
-  return (
-    <main className="min-h-screen text-white bg-gradient-to-b from-[#1F2326] via-[#141618] to-[#0B0B0B]">
-      {/* TOP BAR */}
-      <header className="max-w-6xl mx-auto px-6 pt-7">
-        <div className="flex items-center justify-center gap-3">
-          <Image
-            src="/logos/mark-gold.png"
-            alt="Catalyst Coaching"
-            width={26}
-            height={26}
-            priority
-          />
-          <span className="tracking-[0.35em] text-sm font-semibold text-gray-200">
-            CATALYST COACHING
-          </span>
-        </div>
-        <div className="mt-4 h-px w-full bg-[#C9A24D]/70" />
-      </header>
+  const input =
+    "w-full bg-[#141618] border border-white/8 px-4 py-3 text-white text-sm placeholder:text-gray-700 focus:outline-none focus:border-[#C9A24D]/50 transition-colors rounded-none";
 
-      {/* HERO */}
-      <section className="max-w-4xl mx-auto px-6 pt-8 pb-6 text-center">
-        <h1 className="text-4xl md:text-5xl font-semibold tracking-wide">
-          Apply for Coaching
-        </h1>
-        <p className="mt-3 text-gray-300 max-w-2xl mx-auto">
-          Tell us a bit about your goals and schedule. If it’s a fit, we’ll invite
-          you to a strategy call.
-        </p>
+  const label =
+    "block text-[11px] font-semibold tracking-[0.1em] uppercase text-gray-500 mb-2";
+
+  return (
+    <main>
+      {/* ── PAGE HEADER ──────────────────────────────────── */}
+      <section className="pt-36 pb-12 px-6 bg-[#0c0e0f] border-b border-white/5">
+        <div className="max-w-6xl mx-auto text-center">
+          <p className="text-[#C9A24D] text-[11px] font-semibold tracking-[0.45em] mb-3 uppercase">
+            Ready to Start?
+          </p>
+          <h1 className="font-headline text-5xl md:text-6xl font-bold uppercase text-white mb-4">
+            Apply for Coaching
+          </h1>
+          <p className="text-gray-500 max-w-xl mx-auto text-sm leading-relaxed">
+            Complete the application below. If it looks like a strong fit,
+            we'll reach out to schedule a strategy call.
+          </p>
+        </div>
       </section>
 
-      {/* FORM */}
-      <section className="max-w-2xl mx-auto px-6 pb-12">
-        <div className="bg-black/35 border border-white/10 rounded-lg p-5 md:p-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Name */}
+      {/* ── FORM + TRUST SIDEBAR ─────────────────────────── */}
+      <section className="py-16 px-6">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[1fr_460px] gap-12 items-start">
+          {/* ── Left: Trust / What Happens Next ── */}
+          <div className="lg:sticky lg:top-24 space-y-10">
             <div>
-              <label className="block text-sm text-gray-200 mb-1.5">
-                Full Name
-              </label>
-              <input
-                name="name"
-                required
-                className="w-full rounded-md bg-[#0F1113]/70 border border-white/10 px-4 py-2.5 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#C9A24D]/70"
-                placeholder="Your name"
-              />
+              <h2 className="font-headline text-2xl md:text-3xl font-bold uppercase text-white mb-8">
+                What Happens After You Apply
+              </h2>
+
+              <div className="space-y-7">
+                {nextSteps.map((step) => (
+                  <div key={step.num} className="flex gap-5">
+                    <span className="font-headline text-2xl font-bold text-[#C9A24D]/25 leading-none mt-0.5 shrink-0 w-8">
+                      {step.num}
+                    </span>
+                    <div>
+                      <p className="text-white font-semibold text-sm mb-1">
+                        {step.title}
+                      </p>
+                      <p className="text-gray-600 text-sm leading-relaxed">
+                        {step.body}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Email */}
-            <div>
-              <label className="block text-sm text-gray-200 mb-1.5">Email</label>
-              <input
-                name="email"
-                type="email"
-                required
-                className="w-full rounded-md bg-[#0F1113]/70 border border-white/10 px-4 py-2.5 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#C9A24D]/70"
-                placeholder="you@email.com"
-              />
+            {/* Trust card */}
+            <div className="border border-white/5 bg-[#141618] p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Image
+                  src="/logos/mark-gold.png"
+                  alt="Catalyst Coaching"
+                  width={20}
+                  height={20}
+                />
+                <span className="text-[10px] tracking-[0.3em] font-semibold text-white/50 uppercase">
+                  Catalyst Coaching
+                </span>
+              </div>
+              <p className="text-gray-500 text-sm leading-relaxed">
+                We work with a limited number of clients at a time. Submitting
+                an application is not a commitment — it's the first step to
+                finding out if we're the right fit for your goals.
+              </p>
             </div>
+          </div>
 
-            {/* Phone */}
-            <div>
-              <label className="block text-sm text-gray-200 mb-1.5">
-                Phone (optional)
-              </label>
-              <input
-                name="phone"
-                className="w-full rounded-md bg-[#0F1113]/70 border border-white/10 px-4 py-2.5 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#C9A24D]/70"
-                placeholder="(555) 555-5555"
-              />
-            </div>
+          {/* ── Right: Form ── */}
+          <div className="bg-[#0c0e0f] border border-white/5 p-8">
+            <h3 className="text-white font-semibold text-base mb-7">
+              Your Application
+            </h3>
 
-            {/* Goals */}
-            <div>
-              <label className="block text-sm text-gray-200 mb-1.5">
-                Primary Goal
-              </label>
-              <select
-                name="goal"
-                defaultValue="Fat loss"
-                className="w-full rounded-md bg-[#0F1113]/70 border border-white/10 px-4 py-2.5 text-white focus:outline-none focus:border-[#C9A24D]/70"
+            <form
+                onSubmit={handleSubmit}
+                onChange={() => { if (status === "error") setStatus("idle"); }}
+                className="space-y-5"
               >
-                <option>Fat loss</option>
-                <option>Muscle gain</option>
-                <option>Strength + performance</option>
-                <option>Body recomposition</option>
-                <option>Other</option>
-              </select>
-            </div>
+              <div>
+                <label className={label}>Full Name</label>
+                <input
+                  name="name"
+                  required
+                  className={input}
+                  placeholder="Your name"
+                />
+              </div>
 
-            {/* Commitment */}
-            <div>
-              <label className="block text-sm text-gray-200 mb-1.5">
-                Commitment Level
-              </label>
-              <select
-                name="commitment"
-                defaultValue="Ready to start now"
-                className="w-full rounded-md bg-[#0F1113]/70 border border-white/10 px-4 py-2.5 text-white focus:outline-none focus:border-[#C9A24D]/70"
+              <div>
+                <label className={label}>Email Address</label>
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  className={input}
+                  placeholder="you@example.com"
+                />
+              </div>
+
+              <div>
+                <label className={label}>
+                  Phone{" "}
+                  <span className="text-gray-700 normal-case font-normal tracking-normal">
+                    (optional)
+                  </span>
+                </label>
+                <input
+                  name="phone"
+                  className={input}
+                  placeholder="(555) 555-5555"
+                />
+              </div>
+
+              <div>
+                <label className={label}>Primary Goal</label>
+                <select name="goal" defaultValue="Fat loss" className={input}>
+                  <option>Fat loss</option>
+                  <option>Muscle gain</option>
+                  <option>Strength + performance</option>
+                  <option>Body recomposition</option>
+                  <option>Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className={label}>How soon are you ready to start?</label>
+                <select
+                  name="commitment"
+                  defaultValue="Ready to start now"
+                  className={input}
+                >
+                  <option>Ready to start now</option>
+                  <option>Within 2–4 weeks</option>
+                  <option>Exploring options</option>
+                </select>
+              </div>
+
+              <div>
+                <label className={label}>Monthly Investment Range</label>
+                <select
+                  name="budget"
+                  defaultValue="$250–$500"
+                  className={input}
+                >
+                  <option>$250–$500</option>
+                  <option>$500–$1,000</option>
+                  <option>$1,000+</option>
+                </select>
+              </div>
+
+              <div>
+                <label className={label}>
+                  Tell us about your goals and what's held you back
+                </label>
+                <textarea
+                  name="goals_details"
+                  rows={5}
+                  className={input}
+                  placeholder="Share your goals, current routine, and what you've tried before."
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={status === "submitting" || status === "success"}
+                className="w-full bg-[#C9A24D] text-black py-4 font-semibold tracking-wide text-sm hover:bg-[#D4B56A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option>Ready to start now</option>
-                <option>Starting within 2–4 weeks</option>
-                <option>Exploring options</option>
-              </select>
-            </div>
+                {status === "submitting" ? "Submitting…" : status === "error" ? "Try Again" : "Submit Application"}
+              </button>
 
-            {/* Budget */}
-            <div>
-              <label className="block text-sm text-gray-200 mb-1.5">
-                Monthly Budget Range
-              </label>
-              <select
-                name="budget"
-                defaultValue="$500–$1,000"
-                className="w-full rounded-md bg-[#0F1113]/70 border border-white/10 px-4 py-2.5 text-white focus:outline-none focus:border-[#C9A24D]/70"
-              >
-                <option>$250–$500</option>
-                <option>$500–$1,000</option>
-                <option>$1,000+</option>
-              </select>
-            </div>
+              {status === "error" && (
+                <p className="text-red-400 text-sm text-center">
+                  Something went wrong. Please try again.
+                </p>
+              )}
 
-            {/* Notes */}
-            <div>
-              <label className="block text-sm text-gray-200 mb-1.5">
-                Tell us about your goals (and what’s held you back)
-              </label>
-              <textarea
-                name="goals_details"
-                rows={4}
-                className="w-full rounded-md bg-[#0F1113]/70 border border-white/10 px-4 py-2.5 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#C9A24D]/70"
-                placeholder="Share your goals, schedule, and anything we should know."
-              />
-            </div>
-
-            {/* Submit */}
-            <button
-              type="submit"
-              className="w-full bg-[#C9A24D] text-black px-8 py-3 rounded-sm font-semibold hover:opacity-90 transition"
-            >
-              Submit Application
-            </button>
-
-            {status && (
-              <p className="text-sm text-gray-300 text-center pt-1">{status}</p>
-            )}
-
-            <p className="text-xs text-gray-400 text-center">
-              By submitting, you agree to be contacted about your application.
-            </p>
-          </form>
+              <p className="text-[11px] text-gray-700 text-center leading-relaxed">
+                By submitting, you agree to be contacted about your
+                application. No commitment required.
+              </p>
+            </form>
+          </div>
         </div>
       </section>
     </main>
