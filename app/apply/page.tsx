@@ -218,6 +218,44 @@ export default function ApplyPage() {
                 />
               </div>
 
+              <div>
+                <label className={label}>
+                  How did you hear about Catalyst Coaching?
+                </label>
+                <select
+                  name="referral_source"
+                  required
+                  defaultValue=""
+                  className={input}
+                >
+                  <option value="" disabled>Select an option</option>
+                  <option>Instagram</option>
+                  <option>Facebook</option>
+                  <option>TikTok</option>
+                  <option>Google Search</option>
+                  <option>Friend / Family Referral</option>
+                  <option>Current Client Referral</option>
+                  <option>Gym Event</option>
+                  <option>Networking Event</option>
+                  <option>Med Spa Referral</option>
+                  <option>Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className={label}>
+                  If someone referred you, who was it?{" "}
+                  <span className="text-gray-700 normal-case font-normal tracking-normal">
+                    (optional)
+                  </span>
+                </label>
+                <input
+                  name="referral_name"
+                  className={input}
+                  placeholder="Referral name or business name"
+                />
+              </div>
+
               <button
                 type="submit"
                 disabled={status === "submitting" || status === "success"}
