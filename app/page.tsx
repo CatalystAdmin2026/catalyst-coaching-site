@@ -59,22 +59,6 @@ const processSteps = [
   },
 ];
 
-// ── Replace each placeholder with real client data when ready ─────────────
-// Fields to update per card:
-//   beforeSrc / afterSrc  → import Image and point to real photos
-//   name                  → client first name or initials
-//   goal                  → e.g. "Fat Loss", "Contest Prep", "Recomp"
-//   timeframe             → e.g. "12 Weeks", "6 Months"
-//   stat                  → headline result, e.g. "-28 lbs" or "+12 lbs muscle"
-//   quote                 → client testimonial text (1–3 sentences)
-const transformations = [
-  { id: 1, name: "Client Name", goal: "Fat Loss",       timeframe: "12 Weeks", stat: "—", quote: "" },
-  { id: 2, name: "Client Name", goal: "Muscle Gain",    timeframe: "16 Weeks", stat: "—", quote: "" },
-  { id: 3, name: "Client Name", goal: "Recomposition",  timeframe: "20 Weeks", stat: "—", quote: "" },
-  { id: 4, name: "Client Name", goal: "Contest Prep",   timeframe: "24 Weeks", stat: "—", quote: "" },
-  { id: 5, name: "Client Name", goal: "Fat Loss",       timeframe: "12 Weeks", stat: "—", quote: "" },
-  { id: 6, name: "Client Name", goal: "Muscle Gain",    timeframe: "16 Weeks", stat: "—", quote: "" },
-];
 
 const metrics = [
   { value: "17+",   label: "Years of Expertise" },
@@ -156,92 +140,277 @@ export default function HomePage() {
       </section>
 
       {/* ── RESULTS ──────────────────────────────────────── */}
-      {/* To replace a placeholder card: set beforeSrc/afterSrc to real photo paths,
-          fill in name/goal/timeframe/stat/quote in the transformations array above. */}
       <section className="py-24 px-6 bg-[#080909]">
         <div className="max-w-6xl mx-auto">
 
           {/* Section header */}
           <div className="text-center mb-16">
             <p className="text-[#C9A24D] text-[11px] font-semibold tracking-[0.45em] mb-4 uppercase">
-              Client Transformations
+              Real Results
             </p>
             <h2 className="font-headline text-4xl md:text-[56px] font-bold uppercase text-white leading-none mb-5">
-              Real Results.{" "}
-              <span className="text-[#C9A24D]">Real Accountability.</span>
+              Transformations That Speak
             </h2>
-            <p className="text-gray-400 text-base leading-relaxed max-w-2xl mx-auto">
-              Every transformation on this page is built on custom programming, disciplined nutrition, and
-              the kind of accountability that makes sustainable physique change possible — not shortcuts,
-              not guesswork, not cookie-cutter templates.
+            <p className="text-gray-400 text-base leading-relaxed max-w-xl mx-auto">
+              Real clients. Real results. Real commitment.
             </p>
           </div>
 
-          {/* 6-card grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {transformations.map((item) => (
-              <div
-                key={item.id}
-                className="group border border-white/5 bg-[#141618] overflow-hidden flex flex-col"
-              >
-                {/* ── Before / After photo area ─────────────────────────────
-                    When ready, replace each inner <div> with a Next.js <Image>:
-                      <Image src={item.beforeSrc} alt="Before" fill className="object-cover" />
-                    Remove the overlay once real photos are in place.
-                ─────────────────────────────────────────────────────────── */}
-                <div className="relative flex h-64 overflow-hidden">
-                  {/* BEFORE panel */}
-                  <div className="flex-1 bg-[#0d0f10] flex items-center justify-center border-r border-white/5 relative">
-                    {/* ← swap this div for <Image src={item.beforeSrc} fill …> */}
-                    <span className="text-gray-800 text-[10px] tracking-[0.35em] uppercase font-semibold">
-                      Before
-                    </span>
-                  </div>
-                  {/* AFTER panel */}
-                  <div className="flex-1 bg-[#111315] flex items-center justify-center relative">
-                    {/* ← swap this div for <Image src={item.afterSrc} fill …> */}
-                    <span className="text-gray-800 text-[10px] tracking-[0.35em] uppercase font-semibold">
-                      After
-                    </span>
-                  </div>
-                  {/* Coming-soon overlay — remove once real photos are live */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75">
-                    <div className="w-8 h-px bg-[#C9A24D]/50 mb-4" />
-                    <p className="text-[#C9A24D] text-[9px] font-semibold tracking-[0.45em] uppercase mb-1.5">
-                      Client Transformation
-                    </p>
-                    <p className="text-white text-sm font-semibold tracking-wide">Coming Soon</p>
-                    <div className="w-8 h-px bg-[#C9A24D]/50 mt-4" />
-                  </div>
+          {/* 3-card grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            {/* ── Card 1: Maggie E. ── */}
+            <div className="bg-[#141618] border border-white/5 flex flex-col">
+              {/* Before / After side by side */}
+              <div className="relative flex h-72 overflow-hidden">
+                <div className="flex-1 relative">
+                  <Image
+                    src="/images/maggie_eaker_before.jpeg"
+                    alt="Maggie E. — before"
+                    fill
+                    className="object-cover object-center"
+                  />
+                  <span className="absolute bottom-0 left-0 right-0 text-center text-[9px] tracking-[0.3em] font-semibold text-white/70 uppercase bg-black/55 py-1.5">
+                    Before
+                  </span>
                 </div>
+                <div className="flex-1 relative border-l border-black/50">
+                  <Image
+                    src="/images/maggie_eaker_after.jpeg"
+                    alt="Maggie E. — after"
+                    fill
+                    className="object-cover object-center"
+                  />
+                  <span className="absolute bottom-0 left-0 right-0 text-center text-[9px] tracking-[0.3em] font-semibold text-[#C9A24D] uppercase bg-black/55 py-1.5">
+                    After
+                  </span>
+                </div>
+              </div>
 
-                {/* Card body */}
-                <div className="p-6 flex flex-col gap-4 flex-1">
-                  {/* Quote — replace empty string with real testimonial */}
-                  <p className="text-gray-500 text-sm leading-relaxed flex-1 italic min-h-[60px]">
-                    {item.quote
-                      ? `"${item.quote}"`
-                      : "Client testimonial will appear here — specific, results-focused, and in their own words."}
+              {/* Stats block */}
+              <div className="grid grid-cols-3 border-t border-white/5 divide-x divide-white/5">
+                <div className="px-4 py-3">
+                  <p className="text-[9px] text-gray-600 uppercase tracking-[0.2em] mb-1.5">Before</p>
+                  <p className="text-white text-xs font-semibold leading-snug">157 lbs</p>
+                  <p className="text-gray-600 text-[11px]">27% body fat</p>
+                </div>
+                <div className="px-4 py-3">
+                  <p className="text-[9px] text-gray-600 uppercase tracking-[0.2em] mb-1.5">After</p>
+                  <p className="text-white text-xs font-semibold leading-snug">128 lbs</p>
+                  <p className="text-gray-600 text-[11px]">14% body fat</p>
+                </div>
+                <div className="px-4 py-3 flex items-center justify-center">
+                  <p className="text-[#C9A24D] text-xs font-bold text-center leading-snug">
+                    −29 lbs<br />fat loss
                   </p>
+                </div>
+              </div>
 
-                  <div className="border-t border-white/5 pt-4 flex items-end justify-between gap-4">
-                    <div>
-                      <p className="text-white text-sm font-semibold">{item.name}</p>
-                      <p className="text-gray-600 text-xs mt-0.5">
-                        {item.goal} · {item.timeframe}
-                      </p>
-                    </div>
-                    {/* Headline result stat */}
-                    <p className="text-[#C9A24D] text-base font-bold shrink-0">{item.stat}</p>
+              {/* Card body */}
+              <div className="p-6 flex flex-col gap-4 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="text-white font-semibold text-sm">Maggie E.</p>
+                  <p className="text-gray-600 text-[11px] shrink-0">Age 23 · Female · 12 months</p>
+                </div>
+                <p className="text-gray-500 text-xs leading-relaxed flex-1">
+                  Maggie came to Catalyst Coaching ready to lose body fat and improve her physique.
+                  Halfway through her transformation, her confidence and results were so strong that
+                  she decided to pursue competitive bodybuilding. Through consistent training, nutrition
+                  structure, and accountability, she lost nearly 30 pounds while building visible muscle
+                  definition and stepping into a completely new level of confidence.
+                </p>
+                <div className="border-t border-white/5 pt-4">
+                  <p className="text-gray-400 text-xs leading-relaxed italic">
+                    &ldquo;Working with Jermaine completely changed the way I approached fitness. The
+                    accountability, structure, and education helped me build habits that finally produced
+                    lasting results. What started as a fat-loss goal eventually gave me the confidence to
+                    pursue bodybuilding competition prep.&rdquo;
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Card 2: Megi J. ── */}
+            <div className="bg-[#141618] border border-white/5 flex flex-col">
+              {/* Before / After side by side */}
+              <div className="relative flex h-72 overflow-hidden">
+                <div className="flex-1 relative">
+                  <Image
+                    src="/images/megi_jas_before.jpeg"
+                    alt="Megi J. — before"
+                    fill
+                    className="object-cover object-center"
+                  />
+                  <span className="absolute bottom-0 left-0 right-0 text-center text-[9px] tracking-[0.3em] font-semibold text-white/70 uppercase bg-black/55 py-1.5">
+                    Before
+                  </span>
+                </div>
+                <div className="flex-1 relative border-l border-black/50">
+                  <Image
+                    src="/images/megi_jas_after.jpeg"
+                    alt="Megi J. — after"
+                    fill
+                    className="object-cover object-center"
+                  />
+                  <span className="absolute bottom-0 left-0 right-0 text-center text-[9px] tracking-[0.3em] font-semibold text-[#C9A24D] uppercase bg-black/55 py-1.5">
+                    After
+                  </span>
+                </div>
+              </div>
+
+              {/* Stats block */}
+              <div className="grid grid-cols-3 border-t border-white/5 divide-x divide-white/5">
+                <div className="px-4 py-3">
+                  <p className="text-[9px] text-gray-600 uppercase tracking-[0.2em] mb-1.5">Before</p>
+                  <p className="text-white text-xs font-semibold leading-snug">Under 100 lbs</p>
+                  <p className="text-gray-600 text-[11px]">low body weight</p>
+                </div>
+                <div className="px-4 py-3">
+                  <p className="text-[9px] text-gray-600 uppercase tracking-[0.2em] mb-1.5">After</p>
+                  <p className="text-white text-xs font-semibold leading-snug">~110 lbs</p>
+                  <p className="text-gray-600 text-[11px]">lean muscle gain</p>
+                </div>
+                <div className="px-4 py-3 flex items-center justify-center">
+                  <p className="text-[#C9A24D] text-xs font-bold text-center leading-snug">
+                    +10 lbs<br />healthy gain
+                  </p>
+                </div>
+              </div>
+
+              {/* Card body */}
+              <div className="p-6 flex flex-col gap-4 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="text-white font-semibold text-sm">Megi J.</p>
+                  <p className="text-gray-600 text-[11px] shrink-0">Age 27 · Female · 11 months</p>
+                </div>
+                <p className="text-gray-500 text-xs leading-relaxed flex-1">
+                  Megi&apos;s goal was to gain healthy weight and build lean muscle, but the biggest
+                  transformation happened beyond the scale. Together, we rebuilt her relationship with
+                  food, created consistent gym routines, prioritized hydration, improved sleep, and
+                  managed stress. The result: a stronger body, more energy, and a completely different
+                  level of confidence.
+                </p>
+                <div className="border-t border-white/5 pt-4">
+                  <p className="text-gray-400 text-xs leading-relaxed italic">
+                    &ldquo;Jermaine helped me completely fix my relationship with food, training, and
+                    myself. I learned how to fuel my body, stay consistent in the gym, and take care of
+                    my mental health. I gained healthy weight, built confidence, and finally created
+                    routines I can stick to long-term.&rdquo;
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Card 3: Joel R. — 2×3 before/after gallery ── */}
+            <div className="bg-[#141618] border border-white/5 flex flex-col">
+              {/* BEFORE row */}
+              <div>
+                <p className="text-[9px] tracking-[0.35em] font-semibold text-white/40 uppercase bg-[#0c0e0f] px-4 py-2 border-b border-white/5">
+                  Before
+                </p>
+                <div className="grid grid-cols-3 h-36">
+                  <div className="relative border-r border-black/50">
+                    <Image
+                      src="/images/joel_resto_before.jpeg"
+                      alt="Joel R. — before 1"
+                      fill
+                      className="object-cover object-center"
+                    />
+                  </div>
+                  <div className="relative border-r border-black/50">
+                    <Image
+                      src="/images/joel_resto_before2.jpeg"
+                      alt="Joel R. — before 2"
+                      fill
+                      className="object-cover object-center"
+                    />
+                  </div>
+                  <div className="relative">
+                    <Image
+                      src="/images/joel_resto_before3.jpeg"
+                      alt="Joel R. — before 3"
+                      fill
+                      className="object-cover object-center"
+                    />
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
 
-          <p className="text-center mt-10 text-[11px] text-gray-700 tracking-[0.25em] uppercase">
-            Transformations updated as clients complete their programs
-          </p>
+              {/* AFTER row */}
+              <div className="border-t-2 border-[#C9A24D]/30">
+                <p className="text-[9px] tracking-[0.35em] font-semibold text-[#C9A24D]/80 uppercase bg-[#0c0e0f] px-4 py-2 border-b border-white/5">
+                  After
+                </p>
+                <div className="grid grid-cols-3 h-36">
+                  <div className="relative border-r border-black/50">
+                    <Image
+                      src="/images/joel_resto_after.jpeg"
+                      alt="Joel R. — after 1"
+                      fill
+                      className="object-cover object-center"
+                    />
+                  </div>
+                  <div className="relative border-r border-black/50">
+                    <Image
+                      src="/images/joel_resto_after2.jpeg"
+                      alt="Joel R. — after 2"
+                      fill
+                      className="object-cover object-center"
+                    />
+                  </div>
+                  <div className="relative">
+                    <Image
+                      src="/images/joel_resto_after3.jpeg"
+                      alt="Joel R. — after 3"
+                      fill
+                      className="object-cover object-center"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats block */}
+              <div className="grid grid-cols-3 border-t border-white/5 divide-x divide-white/5">
+                <div className="px-4 py-3">
+                  <p className="text-[9px] text-gray-600 uppercase tracking-[0.2em] mb-1.5">Before</p>
+                  <p className="text-white text-xs font-semibold leading-snug">Higher</p>
+                  <p className="text-gray-600 text-[11px]">body fat</p>
+                </div>
+                <div className="px-4 py-3">
+                  <p className="text-[9px] text-gray-600 uppercase tracking-[0.2em] mb-1.5">After</p>
+                  <p className="text-white text-xs font-semibold leading-snug">Lean</p>
+                  <p className="text-gray-600 text-[11px]">+ stronger</p>
+                </div>
+                <div className="px-4 py-3 flex items-center justify-center">
+                  <p className="text-[#C9A24D] text-xs font-bold text-center leading-snug">
+                    Stronger<br />leaner
+                  </p>
+                </div>
+              </div>
+
+              {/* Card body */}
+              <div className="p-6 flex flex-col gap-4 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="text-white font-semibold text-sm">Joel R.</p>
+                  <p className="text-gray-600 text-[11px] shrink-0">Age 44 · Male · 6 months</p>
+                </div>
+                <p className="text-gray-500 text-xs leading-relaxed flex-1">
+                  At 44 years old, Joel wanted to get stronger, leaner, and feel better in his own
+                  skin. We built a plan that fit his busy work schedule and focused on sustainable
+                  habits, progressive training, and smart nutrition. The result was a stronger
+                  physique, better confidence, and a body he feels proud of.
+                </p>
+                <div className="border-t border-white/5 pt-4">
+                  <p className="text-gray-400 text-xs leading-relaxed italic">
+                    &ldquo;Jermaine has amazing knowledge on fitness. He got me into a diet plan and
+                    workout plan that works for my work schedule and helped me get stronger from where
+                    I was before. I&apos;m 44 years old and feel and look great for my age.&rdquo;
+                  </p>
+                </div>
+              </div>
+            </div>
+
+          </div>
         </div>
       </section>
 
