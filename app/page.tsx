@@ -187,31 +187,38 @@ export default function HomePage() {
                 </div>
               </div>
 
+              {/* Client identity */}
+              <div className="px-5 py-3.5 border-t border-white/5 flex items-baseline justify-between gap-2">
+                <p className="text-white font-semibold text-sm">Maggie E.</p>
+                <p className="text-gray-500 text-[11px] shrink-0">Age 23 · Female · 12 months</p>
+              </div>
+
               {/* Stats block */}
-              <div className="grid grid-cols-3 border-t border-white/5 divide-x divide-white/5">
-                <div className="px-4 py-3">
-                  <p className="text-[9px] text-gray-600 uppercase tracking-[0.2em] mb-1.5">Before</p>
-                  <p className="text-white text-xs font-semibold leading-snug">157 lbs</p>
-                  <p className="text-gray-600 text-[11px]">27% body fat</p>
+              <div className="flex border-t border-white/5">
+                <div className="w-2/5 flex flex-col divide-y divide-white/5 border-r border-white/5">
+                  <div className="px-4 py-2.5">
+                    <p className="text-[9px] text-gray-600 uppercase tracking-[0.2em] mb-1">Before</p>
+                    <p className="text-white text-xs font-semibold">157 lbs</p>
+                    <p className="text-gray-600 text-[11px]">27% body fat</p>
+                  </div>
+                  <div className="px-4 py-2.5">
+                    <p className="text-[9px] text-gray-600 uppercase tracking-[0.2em] mb-1">After</p>
+                    <p className="text-white text-xs font-semibold">128 lbs</p>
+                    <p className="text-gray-600 text-[11px]">14% body fat</p>
+                  </div>
                 </div>
-                <div className="px-4 py-3">
-                  <p className="text-[9px] text-gray-600 uppercase tracking-[0.2em] mb-1.5">After</p>
-                  <p className="text-white text-xs font-semibold leading-snug">128 lbs</p>
-                  <p className="text-gray-600 text-[11px]">14% body fat</p>
-                </div>
-                <div className="px-4 py-3 flex items-center justify-center">
-                  <p className="text-[#C9A24D] text-xs font-bold text-center leading-snug">
-                    −29 lbs<br />fat loss
+                <div className="flex-1 flex flex-col items-center justify-center px-4 py-5">
+                  <p className="font-headline text-2xl font-bold text-[#C9A24D] leading-none tracking-tight">
+                    −29 LBS
+                  </p>
+                  <p className="text-[#C9A24D]/60 text-[10px] tracking-[0.25em] uppercase font-semibold mt-2">
+                    Fat Loss
                   </p>
                 </div>
               </div>
 
               {/* Card body */}
               <div className="p-6 flex flex-col gap-4 flex-1">
-                <div className="flex items-baseline justify-between gap-2">
-                  <p className="text-white font-semibold text-sm">Maggie E.</p>
-                  <p className="text-gray-600 text-[11px] shrink-0">Age 23 · Female · 12 months</p>
-                </div>
                 <p className="text-gray-500 text-xs leading-relaxed flex-1">
                   Maggie came to Catalyst Coaching ready to lose body fat and improve her physique.
                   Halfway through her transformation, her confidence and results were so strong that
@@ -221,7 +228,7 @@ export default function HomePage() {
                 </p>
                 <div className="border-t border-white/5 pt-4">
                   <p className="text-gray-400 text-xs leading-relaxed italic">
-                    &ldquo;Working with Jermaine completely changed the way I approached fitness. The
+                    &ldquo;Working with Jermaine completely changed my approach to fitness. The
                     accountability, structure, and education helped me build habits that finally produced
                     lasting results. What started as a fat-loss goal eventually gave me the confidence to
                     pursue bodybuilding competition prep.&rdquo;
@@ -258,31 +265,38 @@ export default function HomePage() {
                 </div>
               </div>
 
+              {/* Client identity */}
+              <div className="px-5 py-3.5 border-t border-white/5 flex items-baseline justify-between gap-2">
+                <p className="text-white font-semibold text-sm">Megi J.</p>
+                <p className="text-gray-500 text-[11px] shrink-0">Age 27 · Female · 11 months</p>
+              </div>
+
               {/* Stats block */}
-              <div className="grid grid-cols-3 border-t border-white/5 divide-x divide-white/5">
-                <div className="px-4 py-3">
-                  <p className="text-[9px] text-gray-600 uppercase tracking-[0.2em] mb-1.5">Before</p>
-                  <p className="text-white text-xs font-semibold leading-snug">Under 100 lbs</p>
-                  <p className="text-gray-600 text-[11px]">low body weight</p>
+              <div className="flex border-t border-white/5">
+                <div className="w-2/5 flex flex-col divide-y divide-white/5 border-r border-white/5">
+                  <div className="px-4 py-2.5">
+                    <p className="text-[9px] text-gray-600 uppercase tracking-[0.2em] mb-1">Before</p>
+                    <p className="text-white text-xs font-semibold">Under 100 lbs</p>
+                    <p className="text-gray-600 text-[11px]">low body weight</p>
+                  </div>
+                  <div className="px-4 py-2.5">
+                    <p className="text-[9px] text-gray-600 uppercase tracking-[0.2em] mb-1">After</p>
+                    <p className="text-white text-xs font-semibold">~110 lbs</p>
+                    <p className="text-gray-600 text-[11px]">lean muscle gain</p>
+                  </div>
                 </div>
-                <div className="px-4 py-3">
-                  <p className="text-[9px] text-gray-600 uppercase tracking-[0.2em] mb-1.5">After</p>
-                  <p className="text-white text-xs font-semibold leading-snug">~110 lbs</p>
-                  <p className="text-gray-600 text-[11px]">lean muscle gain</p>
-                </div>
-                <div className="px-4 py-3 flex items-center justify-center">
-                  <p className="text-[#C9A24D] text-xs font-bold text-center leading-snug">
-                    +10 lbs<br />healthy gain
+                <div className="flex-1 flex flex-col items-center justify-center px-4 py-5">
+                  <p className="font-headline text-2xl font-bold text-[#C9A24D] leading-none tracking-tight">
+                    +10 LBS
+                  </p>
+                  <p className="text-[#C9A24D]/60 text-[10px] tracking-[0.25em] uppercase font-semibold mt-2">
+                    Healthy Gain
                   </p>
                 </div>
               </div>
 
               {/* Card body */}
               <div className="p-6 flex flex-col gap-4 flex-1">
-                <div className="flex items-baseline justify-between gap-2">
-                  <p className="text-white font-semibold text-sm">Megi J.</p>
-                  <p className="text-gray-600 text-[11px] shrink-0">Age 27 · Female · 11 months</p>
-                </div>
                 <p className="text-gray-500 text-xs leading-relaxed flex-1">
                   Megi&apos;s goal was to gain healthy weight and build lean muscle, but the biggest
                   transformation happened beyond the scale. Together, we rebuilt her relationship with
@@ -336,12 +350,12 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* AFTER row */}
-              <div className="border-t-2 border-[#C9A24D]/30">
-                <p className="text-[9px] tracking-[0.35em] font-semibold text-[#C9A24D]/80 uppercase bg-[#0c0e0f] px-4 py-2 border-b border-white/5">
+              {/* AFTER row — slightly more visual weight than BEFORE */}
+              <div className="border-t-2 border-[#C9A24D]/55">
+                <p className="text-[9px] tracking-[0.35em] font-semibold text-[#C9A24D] uppercase bg-[#0c0e0f] px-4 py-2 border-b border-[#C9A24D]/15">
                   After
                 </p>
-                <div className="grid grid-cols-3 h-36">
+                <div className="grid grid-cols-3 h-36 bg-[#C9A24D]/[0.03]">
                   <div className="relative border-r border-black/50">
                     <Image
                       src="/images/joel_resto_after.jpeg"
@@ -369,31 +383,38 @@ export default function HomePage() {
                 </div>
               </div>
 
+              {/* Client identity */}
+              <div className="px-5 py-3.5 border-t border-white/5 flex items-baseline justify-between gap-2">
+                <p className="text-white font-semibold text-sm">Joel R.</p>
+                <p className="text-gray-500 text-[11px] shrink-0">Age 44 · Male · 6 months</p>
+              </div>
+
               {/* Stats block */}
-              <div className="grid grid-cols-3 border-t border-white/5 divide-x divide-white/5">
-                <div className="px-4 py-3">
-                  <p className="text-[9px] text-gray-600 uppercase tracking-[0.2em] mb-1.5">Before</p>
-                  <p className="text-white text-xs font-semibold leading-snug">Higher</p>
-                  <p className="text-gray-600 text-[11px]">body fat</p>
+              <div className="flex border-t border-white/5">
+                <div className="w-2/5 flex flex-col divide-y divide-white/5 border-r border-white/5">
+                  <div className="px-4 py-2.5">
+                    <p className="text-[9px] text-gray-600 uppercase tracking-[0.2em] mb-1">Before</p>
+                    <p className="text-white text-xs font-semibold">Higher</p>
+                    <p className="text-gray-600 text-[11px]">body fat</p>
+                  </div>
+                  <div className="px-4 py-2.5">
+                    <p className="text-[9px] text-gray-600 uppercase tracking-[0.2em] mb-1">After</p>
+                    <p className="text-white text-xs font-semibold">Lean</p>
+                    <p className="text-gray-600 text-[11px]">+ stronger</p>
+                  </div>
                 </div>
-                <div className="px-4 py-3">
-                  <p className="text-[9px] text-gray-600 uppercase tracking-[0.2em] mb-1.5">After</p>
-                  <p className="text-white text-xs font-semibold leading-snug">Lean</p>
-                  <p className="text-gray-600 text-[11px]">+ stronger</p>
-                </div>
-                <div className="px-4 py-3 flex items-center justify-center">
-                  <p className="text-[#C9A24D] text-xs font-bold text-center leading-snug">
-                    Stronger<br />leaner
+                <div className="flex-1 flex flex-col items-center justify-center px-4 py-5">
+                  <p className="font-headline text-2xl font-bold text-[#C9A24D] leading-none tracking-tight">
+                    STRONGER
+                  </p>
+                  <p className="text-[#C9A24D]/60 text-[10px] tracking-[0.25em] uppercase font-semibold mt-2">
+                    Leaner
                   </p>
                 </div>
               </div>
 
               {/* Card body */}
               <div className="p-6 flex flex-col gap-4 flex-1">
-                <div className="flex items-baseline justify-between gap-2">
-                  <p className="text-white font-semibold text-sm">Joel R.</p>
-                  <p className="text-gray-600 text-[11px] shrink-0">Age 44 · Male · 6 months</p>
-                </div>
                 <p className="text-gray-500 text-xs leading-relaxed flex-1">
                   At 44 years old, Joel wanted to get stronger, leaner, and feel better in his own
                   skin. We built a plan that fit his busy work schedule and focused on sustainable
