@@ -30,6 +30,9 @@ export default function Navbar() {
 
   const solid = scrolled || menuOpen;
 
+  // Admin dashboard uses its own chrome — suppress public nav entirely
+  if (pathname === "/admin") return null;
+
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
