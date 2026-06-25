@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 // Replace with your deployed Google Apps Script URL for executive onboarding
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/YOUR_EXECUTIVE_ONBOARDING_SCRIPT_ID/exec";
+  "https://script.google.com/macros/s/AKfycbzo7bkzArWJH0ev-k6l5TmPA1pGUbpjYn_US4hQj4hrVw8qLiHLUxnmH5qC7zPG9YmA/exec";
 
 const PHASES: Phase[] = [
   // ── Phase 1: Personal Information ─────────────────────────────────────
@@ -889,6 +889,7 @@ export default function ExecutiveOnboardingPage() {
       scriptUrl={SCRIPT_URL}
       storageKey="catalyst_executive_progress"
       formType="executive_onboarding"
+      packageType="executive"
     />
     </AccessGuard>
   );
