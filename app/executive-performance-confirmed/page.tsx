@@ -1,20 +1,13 @@
 import type { Metadata } from "next";
 import type { LucideIcon } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
-import {
-  Mail,
-  ClipboardList,
-  Phone,
-  Zap,
-  Crown,
-  Package,
-  Trophy,
-} from "lucide-react";
+import { Mail, ClipboardList, Phone, Zap } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Executive Performance Confirmed | Catalyst Coaching",
   description:
-    "Your Executive Performance coaching program is now active. Welcome to the team.",
+    "Your Executive Performance program is now active. Welcome to the team.",
   robots: { index: false, follow: false },
   openGraph: {
     title: "Executive Performance Confirmed | Catalyst Coaching",
@@ -23,14 +16,9 @@ export const metadata: Metadata = {
   },
 };
 
-/* ── Static data ─────────────────────────────────────── */
+/* ── Data ──────────────────────────────────────────────── */
 
-type Step = {
-  num: string;
-  Icon: LucideIcon;
-  title: string;
-  desc: string;
-};
+type Step = { num: string; Icon: LucideIcon; title: string; desc: string };
 
 const steps: Step[] = [
   {
@@ -42,7 +30,7 @@ const steps: Step[] = [
   {
     num: "02",
     Icon: ClipboardList,
-    title: "Complete Onboarding",
+    title: "Complete Executive Onboarding",
     desc: "Complete your Executive Performance onboarding questionnaire so we can begin building every aspect of your customized coaching system.",
   },
   {
@@ -55,411 +43,583 @@ const steps: Step[] = [
     num: "04",
     Icon: Zap,
     title: "We Get to Work",
-    desc: "Once onboarding is complete, your coaching team begins building your customized systems, nutrition strategy, training program, supplement protocol, and ongoing optimization plan.",
+    desc: "Once onboarding is complete, your coaching team begins building your customized systems, nutrition strategy, training program, and ongoing optimization plan.",
   },
 ];
 
-const packageIncludes: string[] = [
+const perks: string[] = [
   "Unlimited Priority Concierge Support",
   "Unlimited Messaging",
-  "Registered Dietitian Designed Nutrition",
   "Unlimited Program Updates",
-  "Weekly InBody Composition Reviews",
+  "Registered Dietitian Designed Nutrition",
+  "Weekly InBody Reviews",
   "Bloodwork Analysis & Optimization",
   "Quarterly Executive Strategy Sessions",
-  "Travel Nutrition Planning",
   "Restaurant & Dining Strategy",
-  "Personalized Supplement Protocols",
+  "Travel Nutrition Planning",
   "Recovery & Lifestyle Optimization",
   "Priority Response Times",
+  "Personalized Supplement Protocols",
   "InBody Dial H30 Included",
   "Legacy Loyalty Rewards",
 ];
 
-/* Subtle city skyline bar heights for hero background */
-const skylineBars = [28,44,18,58,24,40,66,32,20,50,30,38,54,22,46,28,20,60,26,42,70,34,24,48];
-
-/* ── Component ────────────────────────────────────────── */
+/* ── Page ──────────────────────────────────────────────── */
 
 export default function ExecutivePerformanceConfirmedPage() {
   return (
-    <main className="bg-[#080909]">
+    <>
+      <style>{`
+        @keyframes ep-fade-up {
+          from { opacity: 0; transform: translateY(28px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes ep-shimmer {
+          0%,100% { box-shadow: 0 0 0 0 rgba(201,164,76,0); }
+          50%      { box-shadow: 0 0 36px 6px rgba(201,164,76,0.30), 0 0 72px 12px rgba(201,164,76,0.10); }
+        }
+        @keyframes ep-ring-pulse {
+          0%,100% { opacity: 0.20; transform: scale(1); }
+          50%      { opacity: 0.06; transform: scale(1.14); }
+        }
+        .ep-f0 { opacity:0; animation: ep-fade-up 1s ease forwards; }
+        .ep-f1 { opacity:0; animation: ep-fade-up 1s 0.13s ease forwards; }
+        .ep-f2 { opacity:0; animation: ep-fade-up 1s 0.26s ease forwards; }
+        .ep-f3 { opacity:0; animation: ep-fade-up 1s 0.39s ease forwards; }
+        .ep-f4 { opacity:0; animation: ep-fade-up 1s 0.52s ease forwards; }
+        .ep-f5 { opacity:0; animation: ep-fade-up 1s 0.66s ease forwards; }
+        .ep-shimmer { animation: ep-shimmer 4s ease-in-out 0.8s infinite; }
+        .ep-ring    { animation: ep-ring-pulse 4s ease-in-out infinite; }
 
-      {/* ── HERO ─────────────────────────────────────────── */}
-      <section
-        className="relative min-h-screen flex items-center justify-center overflow-hidden"
-        style={{
-          background: [
-            "radial-gradient(ellipse 80% 60% at 62% 0%, rgba(201,162,77,0.07) 0%, transparent 65%)",
-            "radial-gradient(ellipse 50% 35% at 15% 88%, rgba(201,162,77,0.04) 0%, transparent 55%)",
-            "#080909",
-          ].join(", "),
-        }}
-      >
-        {/* City silhouette — barely perceptible geometric suggestion */}
-        <div
-          className="absolute bottom-0 left-0 right-0 flex items-end justify-center overflow-hidden"
-          style={{ height: 80, opacity: 0.028 }}
-          aria-hidden="true"
-        >
-          {skylineBars.map((h, i) => (
-            <div
-              key={i}
-              className="bg-white shrink-0"
-              style={{ height: h, width: 11, marginRight: 2 }}
-            />
-          ))}
-        </div>
+        /* Card hover — pure CSS so no client JS needed */
+        .ep-card {
+          border-top: 1.5px solid rgba(201,164,76,0.30);
+          transition: background 320ms ease, box-shadow 320ms ease, transform 320ms ease;
+        }
+        .ep-card:hover {
+          background: #0f1010 !important;
+          box-shadow: 0 -2px 0 0 rgba(201,164,76,0.65), 0 16px 48px rgba(201,164,76,0.07);
+          transform: translateY(-3px);
+        }
+        .ep-card:hover .ep-icon {
+          border-color: rgba(201,164,76,0.40);
+        }
+        .ep-card:hover .ep-icon svg {
+          color: #C9A44C !important;
+        }
+        .ep-icon { transition: border-color 320ms ease; }
+        .ep-icon svg { transition: color 320ms ease; }
+      `}</style>
 
-        {/* Horizon line */}
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-[#C9A24D]/10" aria-hidden="true" />
+      <main className="bg-[#080909] overflow-x-hidden">
 
-        {/* Hero content */}
-        <div className="relative z-10 text-center px-6 pt-24 pb-20 max-w-3xl mx-auto w-full">
+        {/* ══════════════════════════════════════════════════
+            HERO — cinematic split layout
+        ══════════════════════════════════════════════════ */}
+        <section className="relative min-h-screen flex bg-[#07060500]">
 
-          {/* Gold outlined checkmark */}
-          <div className="flex justify-center mb-10" aria-hidden="true">
-            <div className="relative w-20 h-20 rounded-full border border-[#C9A24D]/45 flex items-center justify-center">
-              {/* Outer ring */}
-              <div
-                className="absolute rounded-full border border-[#C9A24D]/12"
-                style={{ inset: -8 }}
-              />
-              <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-                <path
-                  d="M4.5 13.5l6 6 11-11"
-                  stroke="#C9A24D"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+          {/* Deep matte black base */}
+          <div className="absolute inset-0 bg-[#080706]" />
+
+          {/* ── Right-side luxury architectural prism ── */}
+          <div className="absolute inset-y-0 right-0 w-full lg:w-[50%] pointer-events-none overflow-hidden" aria-hidden="true">
+
+            {/* Dark warm base */}
+            <div className="absolute inset-0" style={{ background: "#0a0906" }} />
+
+            {/* Ambient field — soft perimeter warmth */}
+            <div className="absolute inset-0" style={{
+              background: [
+                "radial-gradient(ellipse 90% 70% at 80% 18%, rgba(201,164,76,0.22) 0%, rgba(201,164,76,0.06) 45%, transparent 68%)",
+                "radial-gradient(ellipse 50% 80% at 100% 72%, rgba(201,164,76,0.12) 0%, transparent 50%)",
+              ].join(", "),
+            }} />
+
+            {/* ── Facet A — large outer prism plane (sharp left edge) ── */}
+            <div className="absolute inset-0" style={{
+              background: "linear-gradient(122deg, transparent 0%, rgba(201,164,76,0.04) 18%, rgba(201,164,76,0.18) 44%, rgba(201,164,76,0.10) 62%, rgba(201,164,76,0.03) 78%, transparent 92%)",
+              clipPath: "polygon(18% 0%, 100% 0%, 100% 100%, 8% 100%)",
+            }} />
+
+            {/* ── Facet B — inner bright plane, tighter angle ── */}
+            <div className="absolute inset-0" style={{
+              background: "linear-gradient(118deg, transparent 0%, rgba(201,164,76,0.08) 25%, rgba(201,164,76,0.28) 48%, rgba(201,164,76,0.12) 62%, transparent 80%)",
+              clipPath: "polygon(32% 0%, 100% 0%, 100% 100%, 22% 100%)",
+            }} />
+
+            {/* ── Facet C — narrow highlight sliver (hardest edge, most defined) ── */}
+            <div className="absolute inset-0" style={{
+              background: "linear-gradient(115deg, transparent 0%, rgba(201,164,76,0.35) 48%, rgba(201,164,76,0.55) 52%, rgba(201,164,76,0.20) 58%, transparent 70%)",
+              clipPath: "polygon(42% 0%, 52% 0%, 38% 100%, 28% 100%)",
+            }} />
+
+            {/* Hot spot — sharp concentrated source light */}
+            <div className="absolute" style={{
+              top: "8%", right: "8%", width: 420, height: 420,
+              background: "radial-gradient(circle, rgba(201,164,76,0.48) 0%, rgba(201,164,76,0.20) 22%, rgba(201,164,76,0.06) 48%, transparent 68%)",
+              filter: "blur(40px)",
+            }} />
+
+            {/* Tight core glow — unblurred centre point */}
+            <div className="absolute" style={{
+              top: "14%", right: "14%", width: 160, height: 160,
+              background: "radial-gradient(circle, rgba(201,164,76,0.32) 0%, transparent 70%)",
+              filter: "blur(18px)",
+            }} />
+
+            {/* Hard vertical edge A — primary reflective column */}
+            <div className="absolute" style={{
+              top: "6%", bottom: "12%", width: 1.5,
+              left: "calc(100% - 42% - 1px)",
+              background: "linear-gradient(to bottom, transparent 0%, rgba(201,164,76,0.70) 20%, rgba(201,164,76,0.85) 52%, rgba(201,164,76,0.50) 78%, transparent 100%)",
+            }} />
+
+            {/* Hard vertical edge B — secondary inner column */}
+            <div className="absolute" style={{
+              top: "18%", bottom: "22%", width: 1,
+              left: "calc(100% - 58%)",
+              background: "linear-gradient(to bottom, transparent 0%, rgba(201,164,76,0.35) 30%, rgba(201,164,76,0.45) 60%, transparent 100%)",
+            }} />
+
+            {/* Diagonal slash beam — architectural prism refraction */}
+            <div className="absolute" style={{
+              top: 0, bottom: 0, left: 0, right: 0,
+              background: "linear-gradient(112deg, transparent 38%, rgba(201,164,76,0.06) 43%, rgba(201,164,76,0.14) 46%, rgba(201,164,76,0.06) 49%, transparent 54%)",
+            }} />
+
+            {/* Floor warmth */}
+            <div className="absolute bottom-0 left-0 right-0 h-40" style={{
+              background: "linear-gradient(to top, rgba(201,164,76,0.07) 0%, transparent 100%)",
+            }} />
+
+            {/* Left vignette — smooth blend into text area */}
+            <div className="absolute inset-y-0 left-0 w-56" style={{
+              background: "linear-gradient(to right, #080706 30%, rgba(8,7,6,0.80) 55%, transparent 100%)",
+            }} />
+          </div>
+
+          {/* Text content area — left aligned on lg */}
+          <div className="relative z-10 flex items-center min-h-screen w-full">
+            <div className="w-full lg:w-[56%] px-6 md:px-12 lg:px-16 xl:px-24 2xl:px-32 pt-28 pb-20">
+
+              {/* Checkmark */}
+              <div className="ep-f0 flex lg:block justify-center mb-10">
+                <div className="relative inline-flex">
+                  <div className="ep-ring absolute inset-0 rounded-full border border-[#C9A44C]" style={{ inset: -16 }} />
+                  <div className="ep-shimmer w-[76px] h-[76px] rounded-full border border-[#C9A44C]/55 flex items-center justify-center">
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                      <path d="M5 14.5l5.5 5.5 12.5-12.5" stroke="#C9A44C" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Eyebrow */}
+              <p className="ep-f1 text-center lg:text-left text-[#C9A44C] text-[10px] font-semibold tracking-[0.70em] mb-5 uppercase">
+                Welcome to
+              </p>
+
+              {/* Main headline */}
+              <h1 className="ep-f2 font-headline text-center lg:text-left font-bold uppercase leading-[0.88] tracking-tight mb-8 text-white"
+                style={{ fontSize: "clamp(3.5rem, 9vw, 7rem)" }}>
+                Executive<br />
+                <span className="text-[#C9A44C]">Performance</span>
+              </h1>
+
+              {/* Rule */}
+              <div className="ep-f3 flex lg:block justify-center mb-7">
+                <div className="w-12 h-px bg-[#C9A44C]/40" />
+              </div>
+
+              {/* Confirmed line */}
+              <p className="ep-f3 text-center lg:text-left text-gray-200 text-lg md:text-xl font-light tracking-wide mb-5">
+                Payment confirmed. You&apos;re officially inside.
+              </p>
+
+              {/* Body */}
+              <p className="ep-f4 text-center lg:text-left text-gray-500 text-[14px] md:text-[15px] leading-relaxed max-w-lg mb-12 mx-auto lg:mx-0">
+                Thank you for trusting Catalyst Coaching with your health,
+                performance, and future. We&apos;re honored to build something
+                extraordinary together.
+              </p>
+
+              {/* Signature */}
+              <div className="ep-f5 flex lg:block justify-center">
+                <div className="inline-block border-l-2 border-[#C9A44C]/28 pl-6">
+                  <p className="text-white font-semibold text-sm tracking-wide italic mb-1">
+                    Jermaine Jones
+                  </p>
+                  <p className="text-[#C9A44C] text-[11px] tracking-[0.22em] uppercase mb-1">
+                    Founder &amp; Head Coach
+                  </p>
+                  <p className="text-gray-600 text-[11px] tracking-wide">
+                    NFPT-CPT &nbsp;·&nbsp; NPC Competitive Bodybuilder
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Eyebrow */}
-          <p className="text-[#C9A24D] text-[10px] font-semibold tracking-[0.65em] mb-5 uppercase">
-            Welcome to
-          </p>
-
-          {/* Main headline */}
-          <h1 className="font-headline text-6xl sm:text-7xl md:text-[96px] font-bold uppercase leading-none tracking-tight mb-8 text-white">
-            Executive
-            <br />
-            <span className="text-[#C9A24D]">Performance</span>
-          </h1>
-
-          {/* Rule */}
-          <div className="w-10 h-px bg-[#C9A24D]/35 mx-auto mb-8" />
-
-          {/* Status line */}
-          <p className="text-gray-300 text-lg md:text-xl font-light tracking-wide mb-5">
-            Payment confirmed. You&apos;re officially inside.
-          </p>
-
-          {/* Body */}
-          <p className="text-gray-500 text-sm md:text-base leading-relaxed max-w-xl mx-auto mb-14">
-            Thank you for trusting Catalyst Coaching with your health,
-            performance, and future. We&apos;re honored to build something
-            extraordinary together.
-          </p>
-
-          {/* Signature block */}
-          <div className="inline-block text-left border-l-2 border-[#C9A24D]/28 pl-6">
-            <p className="text-white font-semibold text-sm tracking-wide">
-              Jermaine Jones
-            </p>
-            <p className="text-[#C9A24D] text-xs tracking-wider mt-0.5">
-              Founder &amp; Head Coach
-            </p>
-            <p className="text-gray-600 text-[11px] tracking-wide mt-1">
-              NFPT-CPT · NPC Competitive Bodybuilder
-            </p>
+          {/* Scroll indicator */}
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 lg:left-16 lg:translate-x-0 xl:left-24 flex flex-col items-center gap-2 opacity-25" aria-hidden="true">
+            <div className="w-px h-10 bg-[#C9A44C]" />
+            <p className="text-[9px] tracking-[0.55em] text-[#C9A44C]">SCROLL</p>
           </div>
-        </div>
+        </section>
 
-        {/* Scroll indicator */}
-        <div
-          className="absolute bottom-9 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
-          style={{ opacity: 0.22 }}
-          aria-hidden="true"
-        >
-          <div className="w-px h-8 bg-[#C9A24D]" />
-          <p className="text-[9px] tracking-[0.55em] text-[#C9A24D]">SCROLL</p>
-        </div>
-      </section>
+        {/* ══════════════════════════════════════════════════
+            WHAT HAPPENS NEXT
+        ══════════════════════════════════════════════════ */}
+        <section className="py-28 px-6 bg-[#0b0c0d]">
+          <div className="max-w-6xl mx-auto">
 
-      {/* ── WHAT HAPPENS NEXT ─────────────────────────────── */}
-      <section className="py-28 px-6 bg-[#0c0e0f]">
-        <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-16">
+              <p className="text-[#C9A44C] text-[10px] font-semibold tracking-[0.6em] mb-4 uppercase">
+                Your Path Forward
+              </p>
+              <h2 className="font-headline text-4xl md:text-[56px] font-bold uppercase text-white leading-none">
+                What Happens Next
+              </h2>
+            </div>
 
-          <div className="text-center mb-16">
-            <p className="text-[#C9A24D] text-[10px] font-semibold tracking-[0.55em] mb-4 uppercase">
-              Your Path Forward
-            </p>
-            <h2 className="font-headline text-4xl md:text-[54px] font-bold uppercase text-white leading-none">
-              What Happens Next
-            </h2>
-          </div>
+            {/* 4-column cards with gold top accent */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 divide-white/[0.04]">
+              {steps.map((step, i) => {
+                const Icon = step.Icon;
+                return (
+                  <div
+                    key={step.num}
+                    className="ep-card group bg-[#0b0c0d] p-8 xl:p-10 flex flex-col"
+                    style={{
+                      borderRight: i < 3 ? "1px solid rgba(255,255,255,0.03)" : "none",
+                    }}
+                  >
+                    {/* Icon circle */}
+                    <div className="ep-icon w-11 h-11 rounded-full border border-white/[0.10] flex items-center justify-center mb-5">
+                      <Icon size={18} style={{ color: "rgba(201,164,76,0.55)" }} />
+                    </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {steps.map((step) => {
-              const Icon = step.Icon;
-              return (
-                <div
-                  key={step.num}
-                  className="group relative p-9 md:p-10 border border-white/[0.05] bg-[#141618] transition-all duration-300 hover:border-[#C9A24D]/20 hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(201,162,77,0.06)]"
-                >
-                  {/* Number + icon row */}
-                  <div className="flex items-center gap-4 mb-6">
-                    <p className="font-headline text-5xl font-bold text-[#C9A24D]/[0.12] leading-none">
+                    {/* Ghost number */}
+                    <p className="font-headline text-[68px] font-bold leading-none mb-4 -ml-1"
+                      style={{ color: "rgba(201,164,76,0.18)" }}>
                       {step.num}
                     </p>
-                    <div className="w-9 h-9 border border-white/[0.07] flex items-center justify-center transition-colors duration-300 group-hover:border-[#C9A24D]/30">
-                      <Icon
-                        size={15}
-                        className="text-[#C9A24D]/55 transition-colors duration-300 group-hover:text-[#C9A24D]"
+
+                    <h3 className="text-white font-semibold text-[13px] tracking-[0.05em] leading-snug mb-3 uppercase">
+                      {step.title}
+                    </h3>
+
+                    <p className="text-gray-500 text-xs leading-relaxed mt-auto pt-3.5 border-t border-white/[0.04]">
+                      {step.desc}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* ══════════════════════════════════════════════════
+            EXECUTIVE WELCOME KIT
+        ══════════════════════════════════════════════════ */}
+        <section className="py-24 px-6 bg-[#080909]">
+          <div className="max-w-6xl mx-auto">
+
+            <div className="text-center mb-16">
+              <p className="text-[#C9A44C] text-[10px] font-semibold tracking-[0.6em] mb-4 uppercase">
+                Exclusive Member Benefit
+              </p>
+              <h2 className="font-headline text-4xl md:text-[52px] font-bold uppercase text-white leading-none">
+                Your Executive Welcome Kit
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 xl:gap-20 items-center">
+
+              {/* InBody H30 — neutral dark panel so matte black product is visible */}
+              <div>
+                <div
+                  className="relative overflow-hidden"
+                  style={{
+                    background: [
+                      "radial-gradient(ellipse 70% 55% at 50% 65%, rgba(201,164,76,0.09) 0%, transparent 60%)",
+                      "#252525",
+                    ].join(", "),
+                  }}
+                >
+                  {/* Product image */}
+                  <div className="relative aspect-[3/4]">
+                    <div className="absolute inset-2 md:inset-3">
+                      <Image
+                        src="/images/inbody-h30.png"
+                        alt="InBody Dial H30 Body Composition Analyzer"
+                        fill
+                        priority
+                        className="object-contain"
+                        sizes="(max-width: 1024px) 90vw, 44vw"
                       />
                     </div>
                   </div>
 
-                  <h3 className="text-white font-semibold text-[15px] tracking-wide mb-3">
-                    {step.title}
-                  </h3>
-                  <p className="text-gray-500 text-sm leading-relaxed">{step.desc}</p>
+                  {/* Floor gradient — depth */}
+                  <div className="absolute bottom-0 left-0 right-0 h-20" style={{
+                    background: "linear-gradient(to top, rgba(0,0,0,0.35), transparent)",
+                  }} />
+
+                  {/* Branding strip */}
+                  <div className="absolute bottom-0 left-0 right-0 px-6 py-4 flex items-center justify-between">
+                    <span className="text-[9px] tracking-[0.4em] text-white/20 uppercase">Catalyst Coaching</span>
+                    <span className="text-[9px] tracking-[0.3em] text-[#C9A44C]/30 uppercase">Executive Member</span>
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
 
-      {/* ── EXECUTIVE WELCOME KIT ──────────────────────────── */}
-      <section className="py-24 px-6 bg-[#080909]">
-        <div className="max-w-5xl mx-auto">
-
-          <div className="text-center mb-14">
-            <p className="text-[#C9A24D] text-[10px] font-semibold tracking-[0.55em] mb-4 uppercase">
-              Exclusive Member Benefit
-            </p>
-            <h2 className="font-headline text-4xl md:text-[52px] font-bold uppercase text-white leading-none">
-              Your Executive Welcome Kit
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-
-            {/* InBody H30 image placeholder */}
-            <div
-              className="relative aspect-[4/3] bg-[#141618] border border-white/[0.05] flex flex-col items-center justify-center overflow-hidden"
-              style={{
-                background:
-                  "radial-gradient(ellipse 70% 60% at 50% 40%, rgba(201,162,77,0.025) 0%, transparent 70%), #141618",
-              }}
-            >
-              <div className="w-14 h-14 border border-[#C9A24D]/18 flex items-center justify-center mb-4">
-                <Package size={22} className="text-[#C9A24D]/35" />
-              </div>
-              <p className="text-[#C9A24D] text-[10px] tracking-[0.45em] uppercase font-semibold mb-1">
-                Product Image
-              </p>
-              <p className="text-white/50 text-sm font-medium">InBody Dial H30</p>
-              <p className="text-gray-700 text-[10px] text-center leading-relaxed mt-2 max-w-[180px]">
-                Replace with official product photo from inbodyusa.com
-              </p>
-              {/* Box label */}
-              <div className="absolute bottom-4 left-5 right-5 border-t border-white/[0.04] pt-3 flex justify-between">
-                <span className="text-[9px] tracking-[0.3em] text-gray-700 uppercase">
-                  Catalyst Coaching
-                </span>
-                <span className="text-[9px] tracking-[0.25em] text-gray-700 uppercase">
-                  Executive
-                </span>
-              </div>
-            </div>
-
-            {/* Copy */}
-            <div>
-              <p className="text-[#C9A24D] text-[10px] font-semibold tracking-[0.55em] mb-4 uppercase">
-                Next Steps
-              </p>
-              <h3 className="font-headline text-3xl md:text-[40px] font-bold uppercase text-white leading-none mb-7">
-                Your InBody Is On the Way
-              </h3>
-
-              <p className="text-gray-400 text-sm leading-relaxed mb-6">
-                Your complimentary InBody Dial H30 has already been scheduled
-                for shipment.
-              </p>
-
-              <div className="border-l-2 border-[#C9A24D]/28 pl-5 mb-7">
-                <p className="text-[10px] tracking-[0.3em] text-gray-600 uppercase mb-1">
-                  Estimated Delivery
-                </p>
-                <p className="text-white font-semibold text-sm">
-                  3–5 Business Days
-                </p>
+                {/* Product caption */}
+                <div className="mt-4 px-1 flex items-baseline justify-between">
+                  <div>
+                    <p className="text-white text-sm font-semibold tracking-wide">InBody Dial H30</p>
+                    <p className="text-gray-600 text-[11px] mt-0.5">Body Composition Analyzer</p>
+                  </div>
+                  <p className="text-[#C9A44C] text-[10px] tracking-[0.3em] uppercase font-semibold">Complimentary</p>
+                </div>
               </div>
 
-              <div className="space-y-4 text-gray-500 text-sm leading-relaxed mb-7">
-                <p>
-                  As soon as your device ships you&apos;ll automatically receive
-                  tracking information by email.
+              {/* Copy */}
+              <div>
+                <p className="text-[#C9A44C] text-[10px] font-semibold tracking-[0.6em] mb-5 uppercase">
+                  Shipment Confirmed
                 </p>
-                <p>
-                  Once it arrives, we&apos;ll use your weekly body composition
-                  scans to guide precise adjustments to your nutrition, training,
-                  and performance strategy.
-                </p>
-              </div>
 
-              <div className="border border-[#C9A24D]/14 bg-[#C9A24D]/[0.03] px-5 py-3.5">
-                <p className="text-[#C9A24D] text-[10px] tracking-[0.35em] uppercase font-semibold">
-                  Exclusive to Executive Performance Members
+                <h3 className="font-headline text-3xl md:text-[44px] font-bold uppercase text-white leading-none mb-8">
+                  Your InBody Is<br />On the Way
+                </h3>
+
+                <p className="text-gray-400 text-sm leading-relaxed mb-8">
+                  Your complimentary InBody Dial H30 has already been scheduled
+                  for shipment. This device is included exclusively for Executive
+                  Performance members.
                 </p>
+
+                {/* Delivery callout */}
+                <div className="flex items-stretch gap-5 mb-8">
+                  <div className="w-0.5 bg-[#C9A44C]/30 shrink-0 rounded-full" />
+                  <div>
+                    <p className="text-[10px] tracking-[0.4em] text-gray-600 uppercase mb-1">Estimated Delivery</p>
+                    <p className="text-white font-bold text-xl tracking-wide">3–5 Business Days</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4 text-gray-500 text-sm leading-relaxed mb-8">
+                  <p>
+                    As soon as your device ships you&apos;ll automatically receive
+                    tracking information by email.
+                  </p>
+                  <p>
+                    Once it arrives, we&apos;ll use your weekly body composition
+                    scans to guide precise adjustments to your nutrition, training,
+                    and performance strategy every single week.
+                  </p>
+                </div>
+
+                <div className="border border-[#C9A44C]/16 bg-[#C9A44C]/[0.03] px-6 py-4">
+                  <p className="text-[#C9A44C] text-[10px] tracking-[0.4em] uppercase font-semibold">
+                    Exclusive to Executive Performance Members
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ── PERFORMANCE PACKAGE ────────────────────────────── */}
-      <section className="py-24 px-6 bg-[#0c0e0f] border-y border-white/[0.04]">
-        <div className="max-w-4xl mx-auto">
+        {/* ══════════════════════════════════════════════════
+            YOUR EXECUTIVE PERFORMANCE PACKAGE
+        ══════════════════════════════════════════════════ */}
+        <section className="py-24 px-6 bg-[#0b0c0d]">
+          <div className="max-w-5xl mx-auto">
 
-          <div className="text-center mb-14">
-            <p className="text-[#C9A24D] text-[10px] font-semibold tracking-[0.55em] mb-4 uppercase">
-              Everything Included
-            </p>
-            <h2 className="font-headline text-4xl md:text-[52px] font-bold uppercase text-white leading-none">
-              Your Executive Performance Package
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-14">
-            {packageIncludes.map((item) => (
-              <div
-                key={item}
-                className="flex items-center gap-4 py-3.5 border-b border-white/[0.04]"
-              >
-                <div className="shrink-0">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                    <path
-                      d="M2.5 8.5l3.5 3.5 7-7"
-                      stroke="#C9A24D"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-                <span className="text-gray-300 text-sm leading-relaxed">{item}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── LEGACY REWARDS ─────────────────────────────────── */}
-      <section className="py-28 px-6 bg-[#141618]">
-        <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-14 items-center">
-
-            {/* Copy */}
-            <div>
-              <p className="text-[#C9A24D] text-[10px] font-semibold tracking-[0.55em] mb-4 uppercase">
-                Legacy Rewards
+            <div className="text-center mb-14">
+              <p className="text-[#C9A44C] text-[10px] font-semibold tracking-[0.6em] mb-4 uppercase">
+                Everything Included
               </p>
-              <h2 className="font-headline text-4xl md:text-5xl font-bold uppercase text-white leading-none mb-7">
-                The Long Game
+              <h2 className="font-headline text-4xl md:text-[52px] font-bold uppercase text-white leading-none">
+                Your Executive Performance Package
               </h2>
-
-              <div className="space-y-4 text-gray-500 text-sm leading-relaxed mb-8">
-                <p>
-                  Executive Performance was designed for people committed to
-                  building elite health over years—not weeks.
-                </p>
-                <p>
-                  As a thank-you for your long-term commitment, members who
-                  remain enrolled for 24 consecutive months receive a
-                  complimentary{" "}
-                  <span className="text-gray-300 font-medium">
-                    InBody 270 Professional Body Composition Analyzer
-                  </span>{" "}
-                  as our anniversary gift.
-                </p>
-                <p>
-                  This allows you to continue monitoring your health with the
-                  same professional-grade technology used by elite training
-                  facilities.
-                </p>
-              </div>
-
-              <div className="border-l-2 border-[#C9A24D]/18 pl-5">
-                <p className="text-[10px] tracking-[0.35em] text-[#C9A24D]/50 uppercase font-semibold">
-                  Exclusive to Executive Performance Members
-                </p>
-              </div>
             </div>
 
-            {/* InBody 270 image placeholder */}
-            <div
-              className="relative aspect-[4/3] border border-white/[0.04] flex flex-col items-center justify-center overflow-hidden"
-              style={{
-                background:
-                  "radial-gradient(ellipse 70% 60% at 50% 40%, rgba(201,162,77,0.02) 0%, transparent 70%), #0c0e0f",
-              }}
-            >
-              <Trophy size={26} className="text-[#C9A24D]/[0.28] mb-4" />
-              <p className="text-[#C9A24D] text-[10px] tracking-[0.45em] uppercase font-semibold mb-1">
-                24-Month Anniversary Gift
-              </p>
-              <p className="text-white/45 text-sm font-medium">InBody 270</p>
-              <p className="text-gray-700 text-[10px] text-center leading-relaxed mt-2 max-w-[180px]">
-                Replace with official product photo
-              </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-0">
+              {perks.map((item) => (
+                <div key={item} className="flex items-center gap-4 py-[15px] border-b border-white/[0.05]">
+                  <div className="shrink-0">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <path d="M2.5 8.5l3.5 3.5 7-7" stroke="#C9A44C" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <span className="text-gray-300 text-sm leading-snug">{item}</span>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ── PERSONAL MESSAGE ───────────────────────────────── */}
-      <section className="py-32 px-6 bg-[#080909]">
-        <div className="max-w-2xl mx-auto text-center">
+        {/* ══════════════════════════════════════════════════
+            THE LONG GAME — LEGACY REWARDS
+        ══════════════════════════════════════════════════ */}
+        <section className="py-28 px-6 bg-[#080909]">
+          <div className="max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-14 xl:gap-20 items-center">
 
-          <div className="w-8 h-px bg-[#C9A24D]/30 mx-auto mb-10" />
+              {/* Copy — left */}
+              <div className="order-2 lg:order-1">
+                <p className="text-[#C9A44C] text-[10px] font-semibold tracking-[0.6em] mb-5 uppercase">
+                  Legacy Rewards
+                </p>
 
-          <Crown
-            size={17}
-            className="mx-auto mb-10 text-[#C9A24D]/45"
+                <h2 className="font-headline text-5xl md:text-6xl xl:text-[76px] font-bold uppercase text-white leading-none mb-8">
+                  The Long Game
+                </h2>
+
+                <div className="space-y-5 text-gray-500 text-sm leading-relaxed mb-10">
+                  <p>
+                    Executive Performance was built for individuals committed to
+                    elite performance over years—not weeks.
+                  </p>
+                  <p>
+                    As a thank-you for your long-term commitment, members who
+                    remain enrolled for{" "}
+                    <span className="text-gray-200 font-semibold">24 consecutive months</span>{" "}
+                    receive a complimentary{" "}
+                    <span className="text-gray-200 font-semibold">
+                      SaunaBox Solara Full Spectrum Infrared Sauna
+                    </span>{" "}
+                    as our anniversary gift.
+                  </p>
+                  <p>
+                    This symbolizes our commitment to investing in your recovery,
+                    longevity, and continued success. This benefit is exclusive
+                    to Executive Performance members.
+                  </p>
+                </div>
+
+                {/* 24-month callout */}
+                <div className="flex items-center gap-5 border border-white/[0.06] bg-white/[0.015] px-6 py-5">
+                  <p className="font-headline text-[42px] font-bold leading-none shrink-0"
+                    style={{ color: "rgba(201,164,76,0.28)" }}>24</p>
+                  <div className="border-l border-white/[0.06] pl-5">
+                    <p className="text-[#C9A44C] text-[10px] tracking-[0.35em] uppercase font-semibold mb-1">Month Anniversary Gift</p>
+                    <p className="text-gray-500 text-xs leading-relaxed">
+                      Earned through 24 consecutive months of Executive Performance enrollment.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* SaunaBox product — warm dark panel for contrast with matte black */}
+              <div className="order-1 lg:order-2">
+                <div
+                  className="relative overflow-hidden"
+                  style={{
+                    background: [
+                      "radial-gradient(ellipse 65% 55% at 50% 50%, rgba(160,45,15,0.14) 0%, transparent 60%)",
+                      "radial-gradient(ellipse 80% 70% at 50% 70%, rgba(201,164,76,0.05) 0%, transparent 55%)",
+                      "#1e1b16",
+                    ].join(", "),
+                  }}
+                >
+                  <div className="relative aspect-[4/5]">
+                    <div className="absolute inset-6 md:inset-10">
+                      <Image
+                        src="/images/saunabox-solara-product.png"
+                        alt="SaunaBox Solara Full Spectrum Infrared Sauna — 24-Month Anniversary Gift"
+                        fill
+                        priority
+                        className="object-contain drop-shadow-[0_0_48px_rgba(160,45,15,0.45)]"
+                        sizes="(max-width: 1024px) 90vw, 44vw"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Floor reflection — warm red echo */}
+                  <div className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none" style={{
+                    background: "linear-gradient(to top, rgba(140,35,10,0.12), transparent)",
+                  }} />
+
+                  {/* Branding strip */}
+                  <div className="absolute bottom-0 left-0 right-0 px-6 py-4 flex items-center justify-between">
+                    <span className="text-[9px] tracking-[0.4em] text-white/15 uppercase">SaunaBox®</span>
+                    <span className="text-[9px] tracking-[0.3em] text-[#C9A44C]/25 uppercase">Solara</span>
+                  </div>
+                </div>
+
+                {/* Product caption */}
+                <div className="mt-4 px-1 flex items-baseline justify-between">
+                  <div>
+                    <p className="text-white text-sm font-semibold tracking-wide">SaunaBox Solara</p>
+                    <p className="text-gray-600 text-[11px] mt-0.5">Full Spectrum Infrared Sauna</p>
+                  </div>
+                  <p className="text-[#C9A44C] text-[10px] tracking-[0.28em] uppercase font-semibold text-right">24-Month<br />Anniversary Gift</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ══════════════════════════════════════════════════
+            CLOSING — YOU DIDN'T COME THIS FAR TO BE AVERAGE
+        ══════════════════════════════════════════════════ */}
+        <section
+          className="relative py-36 px-6 overflow-hidden"
+          style={{
+            background: [
+              "radial-gradient(ellipse 60% 40% at 50% 90%, rgba(201,164,76,0.06) 0%, transparent 65%)",
+              "#080909",
+            ].join(", "),
+          }}
+        >
+          {/* Ambient floor glow */}
+          <div
+            className="absolute bottom-0 left-1/2 -translate-x-1/2 pointer-events-none"
+            style={{
+              width: 640, height: 220,
+              background: "radial-gradient(ellipse, rgba(201,164,76,0.07) 0%, transparent 65%)",
+              filter: "blur(48px)",
+            }}
+            aria-hidden="true"
           />
 
-          <h2 className="font-headline text-4xl md:text-5xl lg:text-[62px] font-bold uppercase text-white leading-tight tracking-tight mb-10">
-            You Didn&apos;t Come This Far
-            <br />
-            <span className="text-[#C9A24D]">to Be Average.</span>
-          </h2>
+          <div className="relative z-10 max-w-4xl mx-auto text-center">
+            <div className="w-8 h-px bg-[#C9A44C]/35 mx-auto mb-12" />
 
-          <div className="space-y-3 text-gray-500 text-sm leading-relaxed mb-5 max-w-md mx-auto">
-            <p>Elite performance isn&apos;t built through motivation.</p>
-            <p>It&apos;s built through consistency, precision, and relentless execution.</p>
+            <h2 className="font-headline font-bold uppercase leading-[0.88] tracking-tight mb-12">
+              <span className="block text-white" style={{ fontSize: "clamp(2.8rem, 8.5vw, 6.5rem)" }}>
+                You Didn&apos;t Come
+              </span>
+              <span className="block text-white" style={{ fontSize: "clamp(2.8rem, 8.5vw, 6.5rem)" }}>
+                This Far
+              </span>
+              <span className="block text-[#C9A44C]" style={{ fontSize: "clamp(2.8rem, 8.5vw, 6.5rem)" }}>
+                To Be Average.
+              </span>
+            </h2>
+
+            <div className="space-y-2 text-gray-500 text-sm leading-relaxed max-w-sm mx-auto mb-4">
+              <p>Elite performance isn&apos;t built through motivation.</p>
+              <p>It&apos;s built through consistency, precision, and relentless execution.</p>
+            </div>
+
+            <p className="text-gray-300 text-sm font-medium tracking-[0.18em] uppercase mb-14">
+              Welcome to the team.
+            </p>
+
+            <div className="w-8 h-px bg-[#C9A44C]/35 mx-auto mb-12" />
+
+            <Link
+              href="/"
+              className="inline-block bg-[#C9A44C] text-black font-bold tracking-[0.22em] text-[11px] px-16 py-5 uppercase hover:bg-[#D4B56A] transition-colors duration-300"
+            >
+              Return to Home
+            </Link>
           </div>
-
-          <p className="text-gray-300 text-sm font-medium tracking-wide mb-16">
-            Welcome to the team.
-          </p>
-
-          <div className="w-8 h-px bg-[#C9A24D]/30 mx-auto mb-12" />
-
-          {/* CTA */}
-          <Link
-            href="/"
-            className="inline-block bg-[#C9A24D] text-black font-semibold tracking-[0.18em] text-sm px-14 py-5 uppercase hover:bg-[#D4B56A] transition-colors duration-300"
-          >
-            Return to Home
-          </Link>
-        </div>
-      </section>
-    </main>
+        </section>
+      </main>
+    </>
   );
 }
