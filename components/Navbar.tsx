@@ -62,6 +62,12 @@ export default function Navbar() {
           >
             About
           </Link>
+          <Link
+            href="/programs"
+            className="text-sm text-gray-400 hover:text-white transition-colors tracking-wide"
+          >
+            Programs
+          </Link>
           {pathname === "/executive-performance-confirmed" ? (
             <button
               type="button"
@@ -75,7 +81,7 @@ export default function Navbar() {
               href="/apply"
               className="text-sm bg-[#C9A24D] text-black px-6 py-2.5 font-semibold tracking-wide hover:bg-[#D4B56A] transition-colors"
             >
-              Apply Now
+              Apply
             </Link>
           )}
         </nav>
@@ -107,7 +113,7 @@ export default function Navbar() {
       {/* Mobile menu */}
       <div
         className={`md:hidden overflow-hidden transition-all duration-300 ${
-          menuOpen ? "max-h-48 opacity-100" : "max-h-0 opacity-0"
+          menuOpen ? "max-h-64 opacity-100" : "max-h-0 opacity-0"
         }`}
       >
         <nav className="px-6 pb-5 pt-2 flex flex-col gap-1 border-t border-white/5">
@@ -116,6 +122,12 @@ export default function Navbar() {
             className="text-gray-300 py-3 text-sm tracking-wide border-b border-white/5 hover:text-white transition-colors"
           >
             About
+          </Link>
+          <Link
+            href="/programs"
+            className="text-gray-300 py-3 text-sm tracking-wide border-b border-white/5 hover:text-white transition-colors"
+          >
+            Programs
           </Link>
           <div className="pt-3">
             {pathname === "/executive-performance-confirmed" ? (
