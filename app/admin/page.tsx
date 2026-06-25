@@ -58,7 +58,7 @@ interface Task {
 }
 
 /* ────────────────────────────────────────────────────────────
-   MOCK DATA
+   CLIENT DATA
    TODO: Replace with live data sources:
      - Google Sheets (onboarding submissions) via Sheets API / Apps Script
      - Stripe (subscriptions, billing) via stripe.customers.list()
@@ -69,204 +69,86 @@ const LEADS: Lead[] = [
   {
     id: 1,
     name: "Maggie Eaker",
-    email: "maggie.eaker@example.com",
-    phone: "(555) 001-0001",
+    email: "—",
+    phone: "—",
     package: "Legacy",
     rate: 120,
-    stripeStatus: "active",
-    nextBilling: "Jul 15",
-    onboardingStatus: "complete",
-    agreementSigned: true,
-    programStatus: "active",
-    checkInDay: "Sunday",
-    nextAction: "Review weekly check-in",
-    pipelineStatus: "Active Client",
-    referralSource: "Instagram",
+    stripeStatus: "pending",
+    nextBilling: "—",
+    onboardingStatus: "not_started",
+    agreementSigned: false,
+    programStatus: "not_built",
+    checkInDay: "—",
+    nextAction: "Await Stripe enrollment and onboarding completion",
+    pipelineStatus: "Payment Link Sent",
+    referralSource: "—",
     flags: [],
-    enrolledDate: "Mar 2024",
+    enrolledDate: "—",
   },
   {
     id: 2,
     name: "Emma Gentile",
-    email: "emma.gentile@example.com",
-    phone: "(555) 002-0002",
+    email: "—",
+    phone: "—",
     package: "Standard",
     rate: 300,
-    stripeStatus: "active",
-    nextBilling: "Jul 8",
-    onboardingStatus: "complete",
-    agreementSigned: true,
-    programStatus: "active",
-    checkInDay: "Monday",
-    nextAction: "Review weekly check-in",
-    pipelineStatus: "Active Client",
-    referralSource: "Referral",
+    stripeStatus: "pending",
+    nextBilling: "—",
+    onboardingStatus: "not_started",
+    agreementSigned: false,
+    programStatus: "not_built",
+    checkInDay: "—",
+    nextAction: "Await Stripe enrollment and onboarding completion",
+    pipelineStatus: "Payment Link Sent",
+    referralSource: "—",
     flags: [],
-    enrolledDate: "Jan 2025",
+    enrolledDate: "—",
   },
   {
     id: 3,
-    name: "Heather Collins",
-    email: "heather.c@example.com",
-    phone: "(555) 003-0003",
+    name: "Heather",
+    email: "—",
+    phone: "—",
     package: "Standard",
     rate: 300,
-    stripeStatus: "active",
-    nextBilling: "Jul 12",
-    onboardingStatus: "complete",
-    agreementSigned: true,
-    programStatus: "active",
-    checkInDay: "Friday",
-    nextAction: "Send program update",
-    pipelineStatus: "Active Client",
-    referralSource: "Instagram",
-    flags: ["Needs Follow-Up"],
-    enrolledDate: "Mar 2025",
+    stripeStatus: "pending",
+    nextBilling: "—",
+    onboardingStatus: "not_started",
+    agreementSigned: false,
+    programStatus: "not_built",
+    checkInDay: "—",
+    nextAction: "Await Stripe enrollment and onboarding completion",
+    pipelineStatus: "Payment Link Sent",
+    referralSource: "—",
+    flags: [],
+    enrolledDate: "—",
   },
   {
     id: 4,
-    name: "Melanie Santos",
-    email: "melanie.s@example.com",
-    phone: "(555) 004-0004",
+    name: "Melanie",
+    email: "—",
+    phone: "—",
     package: "Founding Member",
     rate: 150,
-    stripeStatus: "active",
-    nextBilling: "Jul 20",
-    onboardingStatus: "complete",
-    agreementSigned: true,
-    programStatus: "active",
-    checkInDay: "Wednesday",
-    nextAction: "Review check-in & adjust macros",
-    pipelineStatus: "Active Client",
-    referralSource: "Facebook",
-    flags: [],
-    enrolledDate: "Jun 2024",
-  },
-  {
-    id: 5,
-    name: "Megi Jas",
-    email: "megi.j@example.com",
-    phone: "(555) 005-0005",
-    package: "Standard",
-    rate: 300,
-    stripeStatus: "active",
-    nextBilling: "Jul 18",
-    onboardingStatus: "complete",
-    agreementSigned: true,
-    programStatus: "active",
-    checkInDay: "Thursday",
-    nextAction: "Review weekly check-in",
-    pipelineStatus: "Active Client",
-    referralSource: "Instagram",
-    flags: [],
-    enrolledDate: "Apr 2025",
-  },
-  {
-    id: 6,
-    name: "Marcus Reynolds",
-    email: "marcus.r@example.com",
-    phone: "(555) 006-0006",
-    package: "Executive Performance",
-    rate: 1500,
-    stripeStatus: "active",
-    nextBilling: "Jul 1",
-    onboardingStatus: "started",
-    agreementSigned: true,
-    programStatus: "not_built",
-    checkInDay: "Tuesday",
-    nextAction: "Build executive program — onboarding in progress",
-    pipelineStatus: "Onboarding Started",
-    referralSource: "LinkedIn",
-    flags: ["Program Overdue"],
-    enrolledDate: "Jun 2026",
-  },
-  {
-    id: 7,
-    name: "Ashley Turner",
-    email: "ashley.t@example.com",
-    phone: "(555) 007-0007",
-    package: "Standard",
-    rate: 300,
-    stripeStatus: "past_due",
-    nextBilling: "Jun 30",
-    onboardingStatus: "complete",
-    agreementSigned: true,
-    programStatus: "active",
-    checkInDay: "Saturday",
-    nextAction: "Resolve failed payment — contact client",
-    pipelineStatus: "Active Client",
-    referralSource: "Word of Mouth",
-    flags: ["Payment Issue"],
-    enrolledDate: "Sep 2025",
-  },
-  {
-    id: 8,
-    name: "Jordan Park",
-    email: "jordan.p@example.com",
-    phone: "(555) 008-0008",
-    package: "Standard",
-    rate: 300,
     stripeStatus: "pending",
     nextBilling: "—",
     onboardingStatus: "not_started",
     agreementSigned: false,
     programStatus: "not_built",
     checkInDay: "—",
-    nextAction: "Send Stripe payment link",
+    nextAction: "Follow up regarding Founding Member offer",
     pipelineStatus: "Strategy Call Completed",
-    referralSource: "Instagram",
-    flags: ["Hot Lead"],
-    enrolledDate: "—",
-  },
-  {
-    id: 9,
-    name: "Sofia Mendez",
-    email: "sofia.m@example.com",
-    phone: "(555) 009-0009",
-    package: "Executive Performance",
-    rate: 1500,
-    stripeStatus: "pending",
-    nextBilling: "—",
-    onboardingStatus: "not_started",
-    agreementSigned: false,
-    programStatus: "not_built",
-    checkInDay: "—",
-    nextAction: "Follow up — strategy call was 3 days ago",
-    pipelineStatus: "Strategy Call Completed",
-    referralSource: "Referral",
-    flags: ["Hot Lead", "Needs Follow-Up"],
-    enrolledDate: "—",
-  },
-  {
-    id: 10,
-    name: "Chris Okafor",
-    email: "chris.o@example.com",
-    phone: "(555) 010-0010",
-    package: "Standard",
-    rate: 300,
-    stripeStatus: "pending",
-    nextBilling: "—",
-    onboardingStatus: "not_started",
-    agreementSigned: false,
-    programStatus: "not_built",
-    checkInDay: "—",
-    nextAction: "Review application — schedule strategy call",
-    pipelineStatus: "Applied",
-    referralSource: "Instagram",
+    referralSource: "—",
     flags: [],
     enrolledDate: "—",
   },
 ];
 
 const TASKS: Task[] = [
-  { id: 1, priority: "urgent", type: "Payment Issue", clientName: "Ashley Turner", description: "Resolve failed payment — card declined, follow up immediately", due: "Today" },
-  { id: 2, priority: "urgent", type: "Program Overdue", clientName: "Marcus Reynolds", description: "Build executive program — onboarding started 2 days ago", due: "Today" },
-  { id: 3, priority: "high", type: "Hot Lead Follow-Up", clientName: "Sofia Mendez", description: "Strategy call was 3 days ago — send payment link before momentum is lost", due: "Today" },
-  { id: 4, priority: "high", type: "Send Payment Link", clientName: "Jordan Park", description: "Strategy call complete and client is ready — send Stripe link now", due: "Today" },
-  { id: 5, priority: "normal", type: "Review Check-In", clientName: "Heather Collins", description: "Weekly check-in received — review metrics and send response", due: "Tomorrow" },
-  { id: 6, priority: "normal", type: "Schedule Call", clientName: "Chris Okafor", description: "New application received — reach out to schedule strategy call", due: "This Week" },
-  { id: 7, priority: "normal", type: "Program Refresh", clientName: "Maggie Eaker", description: "Month 4 program block due — update training split", due: "This Week" },
-  { id: 8, priority: "low", type: "Trainerize Invite", clientName: "Marcus Reynolds", description: "Send Trainerize access once program build is complete", due: "After Build" },
+  { id: 1, priority: "high", type: "Confirm Payment", clientName: "Maggie Eaker",  description: "Payment link sent — confirm Stripe payment received", due: "Today" },
+  { id: 2, priority: "high", type: "Confirm Payment", clientName: "Emma Gentile",  description: "Payment link sent — confirm Stripe payment received", due: "Today" },
+  { id: 3, priority: "high", type: "Confirm Payment", clientName: "Heather",       description: "Payment link sent — confirm Stripe payment received", due: "Today" },
+  { id: 4, priority: "high", type: "Follow Up",       clientName: "Melanie",       description: "Awaiting enrollment decision — follow up regarding Founding Member offer", due: "Today" },
 ];
 
 /* ────────────────────────────────────────────────────────────
@@ -381,7 +263,8 @@ function programLabel(s: ProgramStatus) {
 ──────────────────────────────────────────────────────────── */
 
 const activeClients    = LEADS.filter(l => l.pipelineStatus === "Active Client").length;
-const mrr              = LEADS.filter(l => l.stripeStatus === "active").reduce((s, l) => s + l.rate, 0);
+const confirmedMrr     = LEADS.filter(l => l.stripeStatus === "active").reduce((s, l) => s + l.rate, 0);
+const pendingMrr       = LEADS.filter(l => l.stripeStatus === "pending").reduce((s, l) => s + l.rate, 0);
 const newApplications  = LEADS.filter(l => l.pipelineStatus === "Applied").length;
 const programsDue      = LEADS.filter(l => l.programStatus === "not_built" && l.stripeStatus === "active").length;
 const paymentIssues    = LEADS.filter(l => l.stripeStatus === "past_due").length;
@@ -545,9 +428,7 @@ function PipelineTab() {
 ──────────────────────────────────────────────────────────── */
 
 function ClientsTab() {
-  const clients = LEADS.filter(l =>
-    ["Active Client", "Onboarding Started", "Onboarding Complete", "Program In Progress", "Program Delivered"].includes(l.pipelineStatus)
-  );
+  const clients = LEADS;
 
   return (
     <div className="overflow-x-auto -mx-4 md:mx-0">
@@ -603,82 +484,65 @@ function ClientsTab() {
 ──────────────────────────────────────────────────────────── */
 
 function RevenueTab() {
-  const active = LEADS.filter(l => l.stripeStatus === "active");
-  const avgValue = active.length ? Math.round(mrr / active.length) : 0;
+  const confirmed = LEADS.filter(l => l.stripeStatus === "active");
+  const pending   = LEADS.filter(l => l.stripeStatus === "pending");
+  const avgValue  = confirmed.length ? Math.round(confirmedMrr / confirmed.length) : 0;
 
-  const breakdown: { label: string; count: number; amount: number }[] = [
-    {
-      label: "Executive Performance",
-      count: active.filter(l => l.package === "Executive Performance").length,
-      amount: active.filter(l => l.package === "Executive Performance").reduce((s, l) => s + l.rate, 0),
-    },
-    {
-      label: "Standard",
-      count: active.filter(l => l.package === "Standard").length,
-      amount: active.filter(l => l.package === "Standard").reduce((s, l) => s + l.rate, 0),
-    },
-    {
-      label: "Founding Member",
-      count: active.filter(l => l.package === "Founding Member").length,
-      amount: active.filter(l => l.package === "Founding Member").reduce((s, l) => s + l.rate, 0),
-    },
-    {
-      label: "Legacy",
-      count: active.filter(l => l.package === "Legacy").length,
-      amount: active.filter(l => l.package === "Legacy").reduce((s, l) => s + l.rate, 0),
-    },
-  ].filter(r => r.count > 0);
+  const confirmedBreakdown: { label: string; count: number; amount: number }[] = (
+    ["Executive Performance", "Standard", "Founding Member", "Legacy"] as Package[]
+  ).map(pkg => ({
+    label: pkg,
+    count:  confirmed.filter(l => l.package === pkg).length,
+    amount: confirmed.filter(l => l.package === pkg).reduce((s, l) => s + l.rate, 0),
+  })).filter(r => r.count > 0);
 
   return (
     <div className="space-y-8">
-      {/* Big MRR */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: "Monthly Recurring Revenue", value: `$${mrr.toLocaleString()}`, gold: true },
-          { label: "Active Subscriptions", value: active.length.toString() },
-          { label: "Failed Payments", value: paymentIssues.toString(), warn: paymentIssues > 0 },
-          { label: "Avg. Client Value", value: `$${avgValue}/mo` },
-        ].map(({ label, value, gold, warn }) => (
-          <div key={label} className="bg-[#0d0e0f] border border-white/[0.06] px-5 py-5">
-            <p className={`text-3xl font-bold mb-1 tabular-nums ${gold ? "text-[#C9A24D]" : warn ? "text-red-400" : "text-white"}`}>
-              {value}
-            </p>
-            <p className="text-[10px] text-gray-600 uppercase tracking-[0.35em] leading-relaxed">{label}</p>
-          </div>
-        ))}
-      </div>
 
-      {/* Package breakdown */}
+      {/* ── Confirmed MRR ── */}
       <div>
-        <h3 className="text-[10px] tracking-[0.5em] text-gray-600 uppercase font-semibold mb-4">Revenue by Package</h3>
-        <div className="space-y-2">
-          {breakdown.map(r => (
-            <div key={r.label} className="flex items-center gap-4 bg-[#0d0e0f] border border-white/[0.05] px-4 py-3">
-              <span className="text-gray-300 text-sm w-40 shrink-0">{r.label}</span>
-              <span className="text-gray-600 text-xs w-20">{r.count} {r.count === 1 ? "client" : "clients"}</span>
-              {/* Bar */}
-              <div className="flex-1 h-1 bg-white/[0.05] rounded-full">
-                <div
-                  className="h-1 bg-[#C9A24D]/50 rounded-full"
-                  style={{ width: `${Math.round((r.amount / mrr) * 100)}%` }}
-                />
-              </div>
-              <span className="text-[#C9A24D] font-semibold text-sm tabular-nums w-20 text-right">
-                ${r.amount.toLocaleString()}/mo
-              </span>
-              <span className="text-gray-700 text-xs w-10 text-right">
-                {Math.round((r.amount / mrr) * 100)}%
-              </span>
+        <h3 className="text-[10px] tracking-[0.5em] text-gray-600 uppercase font-semibold mb-4">Confirmed MRR</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
+          {[
+            { label: "Confirmed MRR",        value: `$${confirmedMrr.toLocaleString()}`, gold: true,  warn: false },
+            { label: "Active Subscriptions", value: confirmed.length.toString(),          gold: false, warn: false },
+            { label: "Failed Payments",      value: paymentIssues.toString(),             gold: false, warn: paymentIssues > 0 },
+            { label: "Avg. Client Value",    value: `$${avgValue}/mo`,                   gold: false, warn: false },
+          ].map(({ label, value, gold, warn }) => (
+            <div key={label} className="bg-[#0d0e0f] border border-white/[0.06] px-5 py-5">
+              <p className={`text-3xl font-bold mb-1 tabular-nums ${gold ? "text-[#C9A24D]" : warn ? "text-red-400" : "text-white"}`}>
+                {value}
+              </p>
+              <p className="text-[10px] text-gray-600 uppercase tracking-[0.35em] leading-relaxed">{label}</p>
             </div>
           ))}
         </div>
-      </div>
 
-      {/* Individual subscription status */}
-      <div>
-        <h3 className="text-[10px] tracking-[0.5em] text-gray-600 uppercase font-semibold mb-4">Subscription Status</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[600px] text-xs">
+        {/* Confirmed breakdown by package */}
+        {confirmedBreakdown.length > 0 && (
+          <div className="space-y-2">
+            {confirmedBreakdown.map(r => (
+              <div key={r.label} className="flex items-center gap-4 bg-[#0d0e0f] border border-white/[0.05] px-4 py-3">
+                <span className="text-gray-300 text-sm w-40 shrink-0">{r.label}</span>
+                <span className="text-gray-600 text-xs w-20">{r.count} {r.count === 1 ? "client" : "clients"}</span>
+                <div className="flex-1 h-1 bg-white/[0.05] rounded-full">
+                  <div className="h-1 bg-[#C9A24D]/50 rounded-full"
+                    style={{ width: confirmedMrr > 0 ? `${Math.round((r.amount / confirmedMrr) * 100)}%` : "0%" }} />
+                </div>
+                <span className="text-[#C9A24D] font-semibold text-sm tabular-nums w-20 text-right">
+                  ${r.amount.toLocaleString()}/mo
+                </span>
+                <span className="text-gray-700 text-xs w-10 text-right">
+                  {confirmedMrr > 0 ? Math.round((r.amount / confirmedMrr) * 100) : 0}%
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Confirmed subscription table */}
+        <div className="overflow-x-auto mt-4">
+          <table className="w-full min-w-[560px] text-xs">
             <thead>
               <tr className="border-b border-white/[0.06]">
                 {["Name", "Package", "Rate", "Status", "Next Billing"].map(h => (
@@ -687,7 +551,7 @@ function RevenueTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.03]">
-              {LEADS.filter(l => l.stripeStatus !== "pending").map(l => (
+              {LEADS.filter(l => l.stripeStatus === "active" || l.stripeStatus === "past_due").map(l => (
                 <tr key={l.id} className={`hover:bg-white/[0.015] ${l.stripeStatus === "past_due" ? "bg-red-500/[0.03]" : ""}`}>
                   <td className="px-3 py-2.5 text-white font-medium">{l.name}</td>
                   <td className="px-3 py-2.5"><Badge cls={pkgCls(l.package)} text={l.package} /></td>
@@ -700,6 +564,51 @@ function RevenueTab() {
           </table>
         </div>
       </div>
+
+      {/* ── Pending MRR ── */}
+      <div>
+        <h3 className="text-[10px] tracking-[0.5em] text-gray-600 uppercase font-semibold mb-4">Pending MRR</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-5">
+          {[
+            { label: "Pending MRR",      value: `$${pendingMrr.toLocaleString()}`, note: "if all convert" },
+            { label: "Pending Leads",    value: pending.length.toString(),          note: "payment link sent or awaiting decision" },
+            { label: "Avg. Pending Rate",value: pending.length ? `$${Math.round(pendingMrr / pending.length)}/mo` : "—", note: "per lead" },
+          ].map(({ label, value, note }) => (
+            <div key={label} className="bg-[#0d0e0f] border border-white/[0.06] border-dashed px-5 py-5">
+              <p className="text-3xl font-bold mb-1 tabular-nums text-gray-400">{value}</p>
+              <p className="text-[10px] text-gray-700 uppercase tracking-[0.35em] leading-relaxed">{label}</p>
+              <p className="text-[10px] text-gray-700 mt-1 normal-case tracking-normal">{note}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Pending leads table */}
+        {pending.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[500px] text-xs">
+              <thead>
+                <tr className="border-b border-white/[0.06]">
+                  {["Name", "Package", "Rate", "Stage", "Next Action"].map(h => (
+                    <th key={h} className="px-3 py-2 text-left text-[10px] font-semibold tracking-[0.35em] text-gray-700 uppercase">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.03]">
+                {pending.map(l => (
+                  <tr key={l.id} className="hover:bg-white/[0.015]">
+                    <td className="px-3 py-2.5 text-gray-300 font-medium">{l.name}</td>
+                    <td className="px-3 py-2.5"><Badge cls={pkgCls(l.package)} text={l.package} /></td>
+                    <td className="px-3 py-2.5 text-gray-500 tabular-nums">${l.rate}/mo</td>
+                    <td className="px-3 py-2.5"><Badge cls={pipeCls(l.pipelineStatus)} text={l.pipelineStatus} /></td>
+                    <td className="px-3 py-2.5 text-gray-600">{l.nextAction}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }
@@ -870,11 +779,11 @@ export default function AdminPage() {
         {/* ── STAT CARDS ─────────────────────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
           {[
-            { label: "Active Clients",  value: activeClients,          suffix: "",      warn: false, gold: false },
-            { label: "Monthly Revenue", value: `$${mrr.toLocaleString()}`, suffix: "/mo", warn: false, gold: true  },
-            { label: "New Applications",value: newApplications,        suffix: "",      warn: false, gold: false },
-            { label: "Programs Due",    value: programsDue,             suffix: "",      warn: programsDue > 0, gold: false },
-            { label: "Payment Issues",  value: paymentIssues,           suffix: "",      warn: paymentIssues > 0, gold: false },
+            { label: "Active Clients",   value: activeClients,                    suffix: "",      warn: false,              gold: false },
+            { label: "Confirmed MRR",   value: `$${confirmedMrr.toLocaleString()}`, suffix: "/mo",   warn: false,              gold: true  },
+            { label: "New Applications",value: newApplications,                   suffix: "",      warn: false,              gold: false },
+            { label: "Programs Due",    value: programsDue,                       suffix: "",      warn: programsDue > 0,    gold: false },
+            { label: "Payment Issues",  value: paymentIssues,                     suffix: "",      warn: paymentIssues > 0,  gold: false },
           ].map(({ label, value, suffix, warn, gold }) => (
             <div key={label} className="bg-[#0d0e0f] border border-white/[0.06] px-4 py-4 relative overflow-hidden">
               <div className="h-px w-full absolute top-0 left-0 right-0 bg-gradient-to-r from-transparent via-[#C9A24D]/20 to-transparent" />
