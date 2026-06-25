@@ -3,12 +3,20 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+
+  // TODO: Replace this client-side sessionStorage flag with server-side Stripe
+  // session verification before production.
+  const handleExecOnboarding = () => {
+    sessionStorage.setItem("catalyst_executive_paid_access", "true");
+    router.push("/executive-onboarding");
+  };
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -54,12 +62,22 @@ export default function Navbar() {
           >
             About
           </Link>
-          <Link
-            href="/apply"
-            className="text-sm bg-[#C9A24D] text-black px-6 py-2.5 font-semibold tracking-wide hover:bg-[#D4B56A] transition-colors"
-          >
-            Apply Now
-          </Link>
+          {pathname === "/executive-performance-confirmed" ? (
+            <button
+              type="button"
+              onClick={handleExecOnboarding}
+              className="text-sm bg-[#C9A24D] text-black px-6 py-2.5 font-semibold tracking-wide hover:bg-[#D4B56A] transition-colors"
+            >
+              Complete Onboarding
+            </button>
+          ) : (
+            <Link
+              href="/apply"
+              className="text-sm bg-[#C9A24D] text-black px-6 py-2.5 font-semibold tracking-wide hover:bg-[#D4B56A] transition-colors"
+            >
+              Apply Now
+            </Link>
+          )}
         </nav>
 
         {/* Mobile toggle */}
@@ -100,12 +118,22 @@ export default function Navbar() {
             About
           </Link>
           <div className="pt-3">
-            <Link
-              href="/apply"
-              className="block bg-[#C9A24D] text-black py-3 text-center font-semibold text-sm tracking-wide hover:bg-[#D4B56A] transition-colors"
-            >
-              Apply for Coaching
-            </Link>
+            {pathname === "/executive-performance-confirmed" ? (
+              <button
+                type="button"
+                onClick={handleExecOnboarding}
+                className="block w-full bg-[#C9A24D] text-black py-3 text-center font-semibold text-sm tracking-wide hover:bg-[#D4B56A] transition-colors"
+              >
+                Complete Onboarding
+              </button>
+            ) : (
+              <Link
+                href="/apply"
+                className="block bg-[#C9A24D] text-black py-3 text-center font-semibold text-sm tracking-wide hover:bg-[#D4B56A] transition-colors"
+              >
+                Apply for Coaching
+              </Link>
+            )}
           </div>
         </nav>
       </div>

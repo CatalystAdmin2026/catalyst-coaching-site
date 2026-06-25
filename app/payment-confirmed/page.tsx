@@ -1,4 +1,5 @@
 import Button from "@/components/Button";
+import PaidAccessButton from "@/components/PaidAccessButton";
 
 const steps = [
   {
@@ -23,9 +24,23 @@ const steps = [
   },
 ];
 
-export default function PaymentConfirmedPage() {
+export default async function PaymentConfirmedPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ access?: string }>;
+}) {
+  const { access } = await searchParams;
+  const showBlockedMessage = access === "required";
+
   return (
     <main className="bg-[#080909] min-h-screen">
+      {showBlockedMessage && (
+        <div className="fixed top-16 inset-x-0 z-40 bg-[#C9A24D]/[0.06] border-b border-[#C9A24D]/20 backdrop-blur-sm">
+          <p className="text-[12px] text-[#C9A24D]/85 font-medium text-center px-6 py-3 tracking-wide">
+            Onboarding access is available after payment is confirmed.
+          </p>
+        </div>
+      )}
       {/* ── HERO / CONFIRMATION ────────────────────────── */}
       <section className="relative pt-32 pb-20 px-6 text-center overflow-hidden">
         {/* Subtle gold radial glow behind headline */}
@@ -137,9 +152,13 @@ export default function PaymentConfirmedPage() {
       <section className="pb-20 px-6">
         <div className="max-w-3xl mx-auto text-center">
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button href="#" size="lg">
+            <PaidAccessButton
+              sessionKey="catalyst_standard_paid_access"
+              href="/onboarding"
+              className="inline-block bg-[#C9A24D] text-black hover:bg-[#D4B56A] px-10 py-4 text-sm font-semibold tracking-wide transition-colors duration-200 text-center leading-none"
+            >
               Complete Onboarding Questionnaire
-            </Button>
+            </PaidAccessButton>
             <Button href="/" size="lg" variant="outline">
               Return Home
             </Button>

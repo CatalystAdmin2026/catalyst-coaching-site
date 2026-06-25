@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Welcome to Executive Performance</title>
+  <style>
+    body { margin: 0; padding: 0; background: #080909; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    .wrapper { max-width: 600px; margin: 0 auto; background: #080909; }
+    .header { background: #0c0d0e; border-bottom: 1px solid rgba(201,164,76,0.15); padding: 28px 40px; display: flex; align-items: center; justify-content: space-between; }
+    .logo-text { font-size: 11px; font-weight: 600; letter-spacing: 0.28em; color: rgba(255,255,255,0.7); text-transform: uppercase; }
+    .header-badge { font-size: 9px; font-weight: 600; letter-spacing: 0.4em; text-transform: uppercase; color: #C9A44C; border: 1px solid rgba(201,164,76,0.3); padding: 5px 10px; }
+    .hero { padding: 56px 40px 44px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.05); background: linear-gradient(180deg, rgba(201,164,76,0.03) 0%, transparent 100%); }
+    .eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.6em; color: #C9A44C; text-transform: uppercase; margin-bottom: 20px; }
+    .headline { font-size: 48px; font-weight: 800; text-transform: uppercase; line-height: 0.92; letter-spacing: -0.02em; color: #ffffff; margin: 0 0 8px; }
+    .headline-accent { color: #C9A44C; }
+    .divider { width: 32px; height: 1px; background: rgba(201,164,76,0.35); margin: 28px auto; }
+    .body-text { font-size: 14px; line-height: 1.75; color: rgba(240,239,235,0.6); max-width: 440px; margin: 0 auto; }
+    .body-text strong { color: #f0efeb; font-weight: 600; }
+    .content { padding: 40px; }
+    .section-label { font-size: 9px; letter-spacing: 0.5em; text-transform: uppercase; color: rgba(255,255,255,0.3); margin-bottom: 20px; }
+    .step-card { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07); border-top: 1.5px solid rgba(201,164,76,0.3); padding: 20px 24px; margin-bottom: 8px; display: flex; gap: 20px; align-items: flex-start; }
+    .step-num { font-size: 28px; font-weight: 800; color: rgba(201,164,76,0.2); line-height: 1; flex-shrink: 0; margin-top: 2px; }
+    .step-title { font-size: 13px; font-weight: 600; color: #f0efeb; margin: 0 0 4px; }
+    .step-desc { font-size: 12px; color: rgba(240,239,235,0.5); line-height: 1.6; margin: 0; }
+    .inbody-banner { background: #1a1a1a; border: 1px solid rgba(201,164,76,0.2); padding: 24px 28px; margin: 0 40px 8px; display: flex; gap: 20px; align-items: center; }
+    .inbody-icon { width: 40px; height: 40px; border: 1px solid rgba(201,164,76,0.3); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .inbody-icon-inner { width: 20px; height: 20px; background: rgba(201,164,76,0.3); border-radius: 50%; }
+    .inbody-text-label { font-size: 9px; letter-spacing: 0.4em; text-transform: uppercase; color: #C9A44C; font-weight: 600; margin-bottom: 6px; }
+    .inbody-text-body { font-size: 12px; color: rgba(240,239,235,0.6); line-height: 1.6; margin: 0; }
+    .inbody-text-body strong { color: #f0efeb; }
+    .cta-section { padding: 32px 40px; text-align: center; }
+    .cta-button { display: inline-block; background: #C9A44C; color: #000000; font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; text-decoration: none; padding: 18px 40px; }
+    .notice-box { background: rgba(201,164,76,0.04); border: 1px solid rgba(201,164,76,0.25); padding: 24px 28px; margin: 0 40px 32px; }
+    .notice-label { font-size: 9px; letter-spacing: 0.4em; text-transform: uppercase; color: #C9A44C; font-weight: 600; margin-bottom: 10px; }
+    .notice-text { font-size: 13px; color: rgba(240,239,235,0.7); line-height: 1.6; margin: 0; }
+    .footer { padding: 32px 40px; border-top: 1px solid rgba(255,255,255,0.05); text-align: center; }
+    .footer-headline { font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #ffffff; margin-bottom: 6px; }
+    .footer-accent { font-size: 10px; font-weight: 600; letter-spacing: 0.35em; text-transform: uppercase; color: #C9A44C; margin-bottom: 24px; }
+    .footer-meta { font-size: 11px; color: rgba(255,255,255,0.3); }
+    .footer-email { color: #C9A44C; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="logo-text">Catalyst Coaching</div>
+      <div class="header-badge">Executive Performance</div>
+    </div>
+
+    <!-- Hero -->
+    <div class="hero">
+      <div class="eyebrow">Welcome to</div>
+      <div class="headline">Executive<br><span class="headline-accent">Performance</span></div>
+      <div class="divider"></div>
+      <p class="body-text">
+        Your Executive Performance subscription is now active. You have joined an elite tier of
+        coaching built for those who demand the highest standard of <strong>precision,
+        personalization, and results</strong>.
+      </p>
+    </div>
+
+    <!-- InBody Banner -->
+    <div class="content" style="padding-bottom:0;">
+      <div class="section-label">Your Welcome Kit — In Transit</div>
+    </div>
+    <div class="inbody-banner">
+      <div class="inbody-icon"><div class="inbody-icon-inner"></div></div>
+      <div>
+        <div class="inbody-text-label">InBody Dial H30 — Body Composition Monitor</div>
+        <p class="inbody-text-body">
+          Your <strong>InBody Dial H30</strong> is being shipped to the address provided
+          during checkout. This clinical-grade body composition monitor gives you precision
+          metrics — body fat %, muscle mass, visceral fat — from home, synced directly to
+          your coaching dashboard.
+        </p>
+      </div>
+    </div>
+
+    <!-- Steps -->
+    <div class="content">
+      <div class="section-label" style="margin-top:24px;">What Happens Next</div>
+
+      <div class="step-card">
+        <div class="step-num">01</div>
+        <div>
+          <div class="step-title">Complete Your Executive Onboarding</div>
+          <p class="step-desc">Your 12-phase onboarding questionnaire covers everything from your health optimization goals and bloodwork history to your executive schedule and concierge preferences.</p>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-num">02</div>
+        <div>
+          <div class="step-title">Performance Blueprint Buildout</div>
+          <p class="step-desc">Your custom training system, precision nutrition protocol, and executive performance structure are built within 3–5 business days of questionnaire submission.</p>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-num">03</div>
+        <div>
+          <div class="step-title">Concierge Onboarding Call</div>
+          <p class="step-desc">Your coach will schedule a personal onboarding call to walk through your program, answer questions, and establish your communication cadence.</p>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-num">04</div>
+        <div>
+          <div class="step-title">Execute at the Highest Level</div>
+          <p class="step-desc">Your full performance system is live. Submit check-ins, receive ongoing adjustments, and access your coach directly throughout your journey.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notice -->
+    <div class="notice-box">
+      <div class="notice-label">Action Required — 48 Hours</div>
+      <p class="notice-text">
+        Please complete your Executive Performance onboarding questionnaire within
+        <strong style="color:#f0efeb;">48 hours</strong>. Also, email your progress photos
+        to <strong style="color:#f0efeb;">catalyst.coaching.headcoach@gmail.com</strong>
+        with your full name in the subject line within the same window.
+      </p>
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-section">
+      <!--[if mso]><table><tr><td style="background:#C9A44C;"><![endif]-->
+      <a href="{{EXECUTIVE_ONBOARDING_URL}}" class="cta-button">Begin Executive Onboarding</a>
+      <!--[if mso]></td></tr></table><![endif]-->
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="divider" style="margin-bottom:24px;"></div>
+      <div class="footer-headline">Your performance blueprint is being built.</div>
+      <div class="footer-accent">Executive Performance · Catalyst Coaching</div>
+      <p class="footer-meta">
+        Questions? <a href="mailto:catalyst.coaching.headcoach@gmail.com" class="footer-email">catalyst.coaching.headcoach@gmail.com</a>
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>

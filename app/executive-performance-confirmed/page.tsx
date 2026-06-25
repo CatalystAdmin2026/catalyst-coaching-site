@@ -66,7 +66,14 @@ const perks: string[] = [
 
 /* ── Page ──────────────────────────────────────────────── */
 
-export default function ExecutivePerformanceConfirmedPage() {
+export default async function ExecutivePerformanceConfirmedPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ access?: string }>;
+}) {
+  const { access } = await searchParams;
+  const showBlockedMessage = access === "required";
+
   return (
     <>
       <style>{`
@@ -112,6 +119,14 @@ export default function ExecutivePerformanceConfirmedPage() {
       `}</style>
 
       <main className="bg-[#080909] overflow-x-hidden">
+
+        {showBlockedMessage && (
+          <div className="fixed top-16 inset-x-0 z-40 bg-[#C9A44C]/[0.06] border-b border-[#C9A44C]/20 backdrop-blur-sm">
+            <p className="text-[12px] text-[#C9A44C]/85 font-medium text-center px-6 py-3 tracking-wide">
+              Onboarding access is available after payment is confirmed.
+            </p>
+          </div>
+        )}
 
         {/* ══════════════════════════════════════════════════
             HERO — cinematic split layout
