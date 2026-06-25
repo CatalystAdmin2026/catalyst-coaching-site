@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AdminGate from "@/components/AdminGate";
+import { fetchSheetData, type SheetRow } from "@/lib/sheets";
 
 /* ────────────────────────────────────────────────────────────
    TYPES
@@ -721,18 +722,435 @@ function TasksTab() {
 }
 
 /* ────────────────────────────────────────────────────────────
+   STRIPE EVENTS TAB
+   Phase 2A — webhook route is live, persistence is pending.
+   This tab shows setup instructions and event inventory.
+   No data fetching yet — state is derived from build-time config.
+
+   TODO (Phase 3 — Persistence):
+     - Create /api/stripe/events GET route that reads persisted events
+     - Fetch and display real event log here
+     - Add "Confirm" action to move pipeline lead to Active Client
+──────────────────────────────────────────────────────────── */
+
+// Stripe events the webhook listens for — duplicated from lib/stripe.ts
+// as a static import-free copy (lib/stripe.ts is server-only).
+const STRIPE_HANDLED_EVENTS: { type: string; description: string }[] = [
+  { type: "checkout.session.completed",    description: "Customer completed checkout — maps to a new enrollment" },
+  { type: "customer.subscription.created", description: "Subscription created — mark lead as Active Client" },
+  { type: "customer.subscription.updated", description: "Subscription changed — sync status and price changes" },
+  { type: "customer.subscription.deleted", description: "Subscription cancelled — move to Cancelled stage" },
+  { type: "invoice.paid",                  description: "Monthly invoice succeeded — confirms MRR" },
+  { type: "invoice.payment_failed",        description: "Payment failed — flag past_due, create urgent task" },
+];
+
+const PROD_WEBHOOK_URL = "https://www.catalystcoachingelite.com/api/stripe/webhook";
+
+function StripeEventsTab() {
+  return (
+    <div className="space-y-8">
+
+      {/* Status banner */}
+      <div className="bg-amber-500/[0.05] border border-amber-500/20 px-5 py-4 flex items-start gap-3">
+        <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0 animate-pulse" />
+        <div>
+          <p className="text-amber-300 text-sm font-semibold tracking-wide mb-0.5">
+            Phase 2A — Webhook Foundation Active
+          </p>
+          <p className="text-amber-400/70 text-xs leading-relaxed">
+            Webhook route is deployed at{" "}
+            <code className="font-mono text-amber-300/90">/api/stripe/webhook</code>.
+            Signature verification and event normalization are ready.
+            <br />
+            <strong className="text-amber-300/80">Persistence is pending (Phase 3)</strong> — events are
+            logged to the server console but not yet stored or displayed here.
+          </p>
+        </div>
+      </div>
+
+      {/* Webhook endpoint */}
+      <div>
+        <h3 className="text-[10px] tracking-[0.5em] text-gray-600 uppercase font-semibold mb-3">
+          Webhook Endpoint
+        </h3>
+        <div className="space-y-3">
+          {[
+            {
+              label: "Production URL",
+              value: PROD_WEBHOOK_URL,
+              note: "Register this in Stripe Dashboard → Developers → Webhooks → Add endpoint",
+            },
+            {
+              label: "Local testing",
+              value: "stripe listen --forward-to localhost:3000/api/stripe/webhook",
+              note: "Run in terminal after installing Stripe CLI (brew install stripe/stripe-cli/stripe)",
+            },
+          ].map(({ label, value, note }) => (
+            <div key={label} className="bg-[#0d0e0f] border border-white/[0.05] px-4 py-3">
+              <p className="text-[10px] text-gray-600 uppercase tracking-[0.3em] mb-1">{label}</p>
+              <code className="text-[#C9A24D] text-xs font-mono break-all">{value}</code>
+              <p className="text-gray-600 text-[11px] mt-1.5 leading-relaxed">{note}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Events being handled */}
+      <div>
+        <h3 className="text-[10px] tracking-[0.5em] text-gray-600 uppercase font-semibold mb-3">
+          Events Handled
+        </h3>
+        <div className="space-y-1.5">
+          {STRIPE_HANDLED_EVENTS.map(({ type, description }) => (
+            <div key={type} className="flex items-start gap-4 bg-[#0d0e0f] border border-white/[0.04] px-4 py-2.5">
+              <span className="text-emerald-400 text-[10px] mt-0.5 shrink-0">✓</span>
+              <div>
+                <code className="text-gray-300 text-xs font-mono">{type}</code>
+                <p className="text-gray-600 text-[11px] mt-0.5">{description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Required env vars */}
+      <div>
+        <h3 className="text-[10px] tracking-[0.5em] text-gray-600 uppercase font-semibold mb-3">
+          Environment Variables Required
+        </h3>
+        <div className="space-y-2">
+          {[
+            {
+              key: "STRIPE_SECRET_KEY",
+              where: "Stripe Dashboard → Developers → API Keys → Secret key",
+              note: "Server-side only. Never use NEXT_PUBLIC_ prefix.",
+            },
+            {
+              key: "STRIPE_WEBHOOK_SECRET",
+              where: "Stripe Dashboard → Developers → Webhooks → [endpoint] → Signing secret",
+              note: "Starts with whsec_. For local testing use the secret printed by stripe listen.",
+            },
+          ].map(({ key, where, note }) => (
+            <div key={key} className="bg-[#0d0e0f] border border-white/[0.05] px-4 py-3">
+              <code className="text-[#C9A24D] text-sm font-mono font-semibold">{key}</code>
+              <p className="text-gray-500 text-[11px] mt-1">{where}</p>
+              <p className="text-gray-700 text-[11px] mt-0.5">{note}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-gray-700 text-[11px] mt-2 leading-relaxed">
+          See <code className="text-gray-500 font-mono">env.local.example</code> in the project root for full setup instructions.
+        </p>
+      </div>
+
+      {/* Stripe Dashboard registration steps */}
+      <div>
+        <h3 className="text-[10px] tracking-[0.5em] text-gray-600 uppercase font-semibold mb-3">
+          How to Register in Stripe Dashboard
+        </h3>
+        <ol className="space-y-2">
+          {[
+            'Go to Stripe Dashboard → Developers → Webhooks',
+            'Click "Add endpoint"',
+            `Paste the production URL: ${PROD_WEBHOOK_URL}`,
+            'Under "Select events", add all 6 events listed above',
+            'Click "Add endpoint" to save',
+            'Open the endpoint → copy Signing secret (whsec_...) → paste into .env.local as STRIPE_WEBHOOK_SECRET',
+            'Restart the dev server — webhooks will now be verified and logged',
+          ].map((step, i) => (
+            <li key={i} className="flex items-start gap-3 text-xs text-gray-500">
+              <span className="text-[10px] text-gray-700 font-semibold tracking-wide w-5 shrink-0 pt-0.5">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <span className="leading-relaxed">{step}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      {/* Phase 3 preview */}
+      <div className="bg-[#0d0e0f] border border-white/[0.04] border-dashed px-5 py-4">
+        <p className="text-[10px] tracking-[0.5em] text-gray-700 uppercase font-semibold mb-2">
+          Phase 3 — Persistence (upcoming)
+        </p>
+        <ul className="space-y-1.5 text-[11px] text-gray-700 leading-relaxed">
+          <li>→ Persist each normalized event to a store (Supabase / Upstash / JSON)</li>
+          <li>→ Add GET /api/stripe/events route to read stored events</li>
+          <li>→ Display live event log in this tab with timestamps and amounts</li>
+          <li>→ Auto-update Lead pipeline status when events arrive</li>
+          <li>→ Replace hardcoded Confirmed MRR with live Stripe subscription data</li>
+        </ul>
+      </div>
+
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
+   LIVE SHEETS TAB
+   Fetches raw rows from Google Sheets via the /api/sheets proxy.
+   GAS scripts must have doGet() deployed — see env.local.example.
+
+   TODO (Phase 2 reconciliation):
+     - Map "applications" rows → Lead entries at "Applied" pipeline stage
+     - Dedup by email against manually curated LEADS array
+     - Map "standard-onboarding" rows → update Lead.onboardingStatus
+     - Map "executive-onboarding" rows → update Lead.onboardingStatus
+     - Surface net-new entries as actionable tasks in TasksTab
+──────────────────────────────────────────────────────────── */
+
+type SheetLoadState = {
+  status: "idle" | "loading" | "ok" | "error";
+  rows: SheetRow[];
+  error?: string;
+  unconfigured?: boolean;
+};
+
+function SheetSection({
+  title,
+  state,
+  keyPrefix,
+}: {
+  title: string;
+  state: SheetLoadState;
+  keyPrefix: string;
+}) {
+  const columns =
+    state.rows.length > 0 ? Object.keys(state.rows[0]) : [];
+  const recent = [...state.rows].reverse().slice(0, 15);
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-3">
+        <h3 className="text-[10px] tracking-[0.5em] text-gray-600 uppercase font-semibold">
+          {title}
+        </h3>
+        {state.status === "loading" && (
+          <span className="text-[10px] text-gray-600 animate-pulse">fetching…</span>
+        )}
+        {state.status === "ok" && (
+          <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-sm">
+            {state.rows.length} {state.rows.length === 1 ? "row" : "rows"}
+          </span>
+        )}
+        {state.status === "error" && (
+          <span className="text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded-sm">
+            {state.unconfigured ? "Setup required" : "Error"}
+          </span>
+        )}
+      </div>
+
+      {/* Setup-required callout */}
+      {state.status === "error" && state.unconfigured && (
+        <div className="bg-amber-500/[0.05] border border-amber-500/20 px-4 py-3 text-xs text-amber-400/80 leading-relaxed">
+          GAS read endpoint not configured. Add{" "}
+          <code className="text-amber-300 font-mono text-[11px]">
+            {title.toLowerCase().includes("application")
+              ? "SHEETS_APPLICATIONS_GAS_URL"
+              : "SHEETS_ONBOARDING_GAS_URL"}
+          </code>{" "}
+          to <code className="text-amber-300 font-mono text-[11px]">.env.local</code> and deploy{" "}
+          <code className="text-amber-300 font-mono text-[11px]">doGet()</code> to the Apps Script.
+          See <code className="text-amber-300 font-mono text-[11px]">env.local.example</code> for exact setup steps.
+        </div>
+      )}
+
+      {/* Fetch error */}
+      {state.status === "error" && !state.unconfigured && (
+        <div className="bg-red-500/[0.04] border border-red-500/15 px-4 py-3 text-xs text-red-400/80">
+          {state.error ?? "Unknown error"}
+        </div>
+      )}
+
+      {/* Loading skeleton */}
+      {state.status === "loading" && (
+        <div className="space-y-1.5">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-8 bg-white/[0.02] animate-pulse rounded-sm" />
+          ))}
+        </div>
+      )}
+
+      {/* Empty state */}
+      {state.status === "ok" && state.rows.length === 0 && (
+        <p className="text-gray-700 text-xs py-3">No submissions yet.</p>
+      )}
+
+      {/* Data table */}
+      {state.status === "ok" && state.rows.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs min-w-[600px]">
+            <thead>
+              <tr className="border-b border-white/[0.06]">
+                {columns.map(col => (
+                  <th
+                    key={`${keyPrefix}-h-${col}`}
+                    className="px-3 py-2 text-left text-[10px] font-semibold tracking-[0.3em] text-gray-700 uppercase whitespace-nowrap max-w-[180px] truncate"
+                    title={col}
+                  >
+                    {col}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.03]">
+              {recent.map((row, ri) => (
+                <tr key={`${keyPrefix}-r-${ri}`} className="hover:bg-white/[0.015]">
+                  {columns.map(col => {
+                    const raw = row[col];
+                    const val = raw !== undefined && raw !== "" ? String(raw) : "—";
+                    return (
+                      <td
+                        key={`${keyPrefix}-r-${ri}-${col}`}
+                        className="px-3 py-2 text-gray-400 whitespace-nowrap max-w-[220px]"
+                        title={val}
+                      >
+                        <span className="block truncate">{val || "—"}</span>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {state.rows.length > 15 && (
+            <p className="text-gray-700 text-[10px] px-3 pt-2">
+              Showing 15 most recent of {state.rows.length} total rows.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Loading state used as initial useState value (avoids calling setState in effect)
+const LOADING_STATE: SheetLoadState = { status: "loading", rows: [] };
+
+function LiveSheetsTab() {
+  // Initial value is "loading" so first render already shows loading skeletons.
+  // setState is only called from: (a) .then() async callbacks, (b) the click handler.
+  // Neither is a synchronous setState-in-effect — satisfying the lint rule.
+  const [apps,     setApps]     = useState<SheetLoadState>(LOADING_STATE);
+  const [stdOnb,   setStdOnb]   = useState<SheetLoadState>(LOADING_STATE);
+  const [execOnb,  setExecOnb]  = useState<SheetLoadState>(LOADING_STATE);
+  const [lastFetch, setLastFetch] = useState<string | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  // Click handler sets loading state (event handler — not an effect)
+  const handleRefresh = () => {
+    setApps(LOADING_STATE);
+    setStdOnb(LOADING_STATE);
+    setExecOnb(LOADING_STATE);
+    setRefreshTick(t => t + 1);
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    // No synchronous setState here — only async .then() callbacks below.
+    Promise.all([
+      fetchSheetData("applications"),
+      fetchSheetData("standard-onboarding"),
+      fetchSheetData("executive-onboarding"),
+    ]).then(([appsRes, stdRes, execRes]) => {
+      if (!mounted) return;
+      setApps({
+        status: appsRes.ok ? "ok" : "error",
+        rows: appsRes.rows,
+        error: appsRes.error,
+        unconfigured: appsRes.error?.includes("not set in .env.local"),
+      });
+      setStdOnb({
+        status: stdRes.ok ? "ok" : "error",
+        rows: stdRes.rows,
+        error: stdRes.error,
+        unconfigured: stdRes.error?.includes("not set in .env.local"),
+      });
+      setExecOnb({
+        status: execRes.ok ? "ok" : "error",
+        rows: execRes.rows,
+        error: execRes.error,
+        unconfigured: execRes.error?.includes("not set in .env.local"),
+      });
+      setLastFetch(new Date().toLocaleTimeString());
+    });
+    return () => { mounted = false; };
+  }, [refreshTick]); // re-runs each time the refresh button increments the tick
+
+  return (
+    <div className="space-y-8">
+
+      {/* Header row */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-white text-sm font-semibold tracking-wide">Live Google Sheets</p>
+          <p className="text-gray-600 text-xs mt-0.5">
+            {lastFetch
+              ? `Last fetched at ${lastFetch}`
+              : "Fetching…"}
+          </p>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={apps.status === "loading"}
+          className="text-[11px] tracking-[0.25em] uppercase font-semibold text-gray-500 border border-white/[0.08] px-4 py-2 hover:text-white hover:border-white/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Refresh
+        </button>
+      </div>
+
+      {/* Applications */}
+      <SheetSection
+        title="Recent Applications"
+        state={apps}
+        keyPrefix="apps"
+      />
+
+      <div className="h-px bg-white/[0.04]" />
+
+      {/* Standard Onboarding */}
+      <SheetSection
+        title="Standard Onboarding Submissions"
+        state={stdOnb}
+        keyPrefix="std"
+      />
+
+      <div className="h-px bg-white/[0.04]" />
+
+      {/* Executive Onboarding */}
+      <SheetSection
+        title="Executive Onboarding Submissions"
+        state={execOnb}
+        keyPrefix="exec"
+      />
+
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
    MAIN PAGE
 ──────────────────────────────────────────────────────────── */
 
-type Tab = "overview" | "pipeline" | "clients" | "revenue" | "onboarding" | "tasks";
+type Tab =
+  | "overview"
+  | "pipeline"
+  | "clients"
+  | "revenue"
+  | "onboarding"
+  | "tasks"
+  | "live-sheets"
+  | "stripe-events";
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: "overview",    label: "Overview" },
-  { id: "pipeline",    label: "Pipeline" },
-  { id: "clients",     label: "Clients" },
-  { id: "revenue",     label: "Revenue" },
-  { id: "onboarding",  label: "Onboarding" },
-  { id: "tasks",       label: "Tasks" },
+  { id: "overview",       label: "Overview" },
+  { id: "pipeline",       label: "Pipeline" },
+  { id: "clients",        label: "Clients" },
+  { id: "revenue",        label: "Revenue" },
+  { id: "onboarding",     label: "Onboarding" },
+  { id: "tasks",          label: "Tasks" },
+  { id: "live-sheets",    label: "Live Sheets" },
+  { id: "stripe-events",  label: "Stripe Events" },
 ];
 
 export default function AdminPage() {
@@ -814,12 +1232,14 @@ export default function AdminPage() {
 
         {/* ── TAB CONTENT ────────────────────────────────────── */}
         <div className="mb-16">
-          {tab === "overview"   && <OverviewTab />}
-          {tab === "pipeline"   && <PipelineTab />}
-          {tab === "clients"    && <ClientsTab />}
-          {tab === "revenue"    && <RevenueTab />}
-          {tab === "onboarding" && <OnboardingTab />}
-          {tab === "tasks"      && <TasksTab />}
+          {tab === "overview"       && <OverviewTab />}
+          {tab === "pipeline"       && <PipelineTab />}
+          {tab === "clients"        && <ClientsTab />}
+          {tab === "revenue"        && <RevenueTab />}
+          {tab === "onboarding"     && <OnboardingTab />}
+          {tab === "tasks"          && <TasksTab />}
+          {tab === "live-sheets"    && <LiveSheetsTab />}
+          {tab === "stripe-events"  && <StripeEventsTab />}
         </div>
 
         {/* ── FUTURE INTEGRATIONS ────────────────────────────── */}
@@ -832,11 +1252,11 @@ export default function AdminPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-2">
             {[
-              { label: "Google Sheets — Applications",   note: "Connect Sheets API to pull new applications from the apply form in real time" },
-              { label: "Google Sheets — Onboarding",     note: "Pull completed onboarding form data from both Standard and Executive tabs" },
-              { label: "Stripe — Subscriptions",         note: "Replace mock MRR/billing data with live stripe.subscriptions.list() data" },
-              { label: "Stripe — Failed Payments",       note: "Webhook: payment_intent.payment_failed → alert in command center" },
-              { label: "Authentication",                 note: "Add password protection or NextAuth before this route is deployed to production" },
+              { label: "Google Sheets — Applications",   note: "Phase 1 in progress — see Live Sheets tab. Deploy doGet() to GAS to activate." },
+              { label: "Google Sheets — Onboarding",     note: "Phase 1 in progress — see Live Sheets tab. Deploy doGet() to GAS to activate." },
+              { label: "Stripe — Subscriptions",         note: "Phase 2 in progress — see Stripe Events tab. Persistence pending (Phase 3)." },
+              { label: "Stripe — Failed Payments",       note: "Phase 2 in progress — webhook route live, invoice.payment_failed handled." },
+              { label: "Authentication",                 note: "Replace client-side password gate with NextAuth or Clerk before sharing URL" },
               { label: "Client Detail Pages",            note: "Add /admin/clients/[id] for full profile, notes, history, and messaging" },
               { label: "Task Editing",                   note: "Allow creating, completing, and dismissing tasks within the dashboard" },
               { label: "Trainerize API",                 note: "Sync program delivery status from Trainerize to update programStatus" },
