@@ -155,6 +155,70 @@ export function normalizeStripeEvent(event: Stripe.Event): NormalizedStripeEvent
 }
 
 // ─────────────────────────────────────────────────────────────
+// PACKAGE MAPPING
+// Maps Stripe Price IDs to human-readable package names.
+// Fill in the real Price IDs from Stripe Dashboard:
+//   Dashboard → Products → [product] → Pricing → copy the price_... ID
+//
+// TODO: Populate once Payment Link prices are confirmed in Stripe.
+// ─────────────────────────────────────────────────────────────
+
+export const PRICE_ID_TO_PACKAGE: Record<string, string> = {
+  // "price_...": "Standard",
+  // "price_...": "Founding Member",
+  // "price_...": "Legacy",
+  // "price_...": "Executive Performance",
+};
+
+/** Returns the package name for a Stripe Price ID, or "" if unknown. */
+export function packageFromPriceId(priceId: string | null): string {
+  if (!priceId) return "";
+  return PRICE_ID_TO_PACKAGE[priceId] ?? "";
+}
+
+// ─────────────────────────────────────────────────────────────
+// GAS PAYLOAD
+// Flat object sent to the Stripe Events GAS script (doPost).
+// Matches the column schema in scripts/stripe-events-backend.gs.
+// ─────────────────────────────────────────────────────────────
+
+export interface GasStripePayload {
+  eventType:          string;
+  customerEmail:      string;
+  customerName:       string;
+  customerId:         string;
+  subscriptionId:     string;
+  paymentStatus:      string;
+  subscriptionStatus: string;
+  amountCents:        number | null;
+  currency:           string;
+  productId:          string;
+  priceId:            string;
+  packageName:        string;
+  rawEventId:         string;
+}
+
+export function toGasPayload(
+  event: NormalizedStripeEvent,
+): GasStripePayload {
+  return {
+    eventType:          event.eventType,
+    customerEmail:      event.customerEmail      ?? "",
+    customerName:       event.customerName       ?? "",
+    customerId:         event.customerId         ?? "",
+    subscriptionId:     event.subscriptionId     ?? "",
+    paymentStatus:      event.paymentStatus      ?? "",
+    subscriptionStatus: event.subscriptionStatus ?? "",
+    amountCents:        event.amountCents,
+    currency:           event.currency           ?? "",
+    productId:          event.productId          ?? "",
+    priceId:            event.priceId            ?? "",
+    packageName:        packageFromPriceId(event.priceId),
+    rawEventId:         event.eventId,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
 // WEBHOOK EVENTS WE HANDLE
 // Single source of truth used by both the webhook route and the
 // admin dashboard's Stripe Events tab.

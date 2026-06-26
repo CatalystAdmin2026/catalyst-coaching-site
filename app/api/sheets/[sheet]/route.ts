@@ -11,25 +11,34 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 
-type SheetKey = "applications" | "standard-onboarding" | "executive-onboarding";
+type SheetKey =
+  | "applications"
+  | "standard-onboarding"
+  | "executive-onboarding"
+  | "stripe-events";
 
 const GAS_URL_BY_SHEET: Record<SheetKey, string | undefined> = {
   "applications":          process.env.SHEETS_APPLICATIONS_GAS_URL,
   "standard-onboarding":   process.env.SHEETS_ONBOARDING_GAS_URL,
   "executive-onboarding":  process.env.SHEETS_ONBOARDING_GAS_URL,
+  // Stripe Events GAS script (scripts/stripe-events-backend.gs)
+  // This script has its own dedicated spreadsheet and doGet handler.
+  "stripe-events":         process.env.STRIPE_EVENTS_GAS_URL,
 };
 
-// Parameter sent to the GAS doGet handler so it knows which tab to read
+// Parameter sent to GAS doGet — stripe-events script ignores it (single tab)
 const GAS_SHEET_PARAM: Record<SheetKey, string> = {
   "applications":          "applications",
   "standard-onboarding":   "standard-onboarding",
   "executive-onboarding":  "executive-onboarding",
+  "stripe-events":         "stripe-events",
 };
 
 const ENV_VAR_NAME: Record<SheetKey, string> = {
   "applications":          "SHEETS_APPLICATIONS_GAS_URL",
   "standard-onboarding":   "SHEETS_ONBOARDING_GAS_URL",
   "executive-onboarding":  "SHEETS_ONBOARDING_GAS_URL",
+  "stripe-events":         "STRIPE_EVENTS_GAS_URL",
 };
 
 const VALID_SHEETS = new Set<string>(Object.keys(GAS_URL_BY_SHEET));

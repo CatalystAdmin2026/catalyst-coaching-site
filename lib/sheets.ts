@@ -12,7 +12,8 @@ export type SheetRow = Record<string, string | number | boolean>;
 export type SheetName =
   | "applications"
   | "standard-onboarding"
-  | "executive-onboarding";
+  | "executive-onboarding"
+  | "stripe-events";
 
 export interface SheetsResult {
   ok: boolean;

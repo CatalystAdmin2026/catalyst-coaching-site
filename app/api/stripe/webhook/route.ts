@@ -11,15 +11,17 @@
 //   stripe listen --forward-to localhost:3000/api/stripe/webhook
 //   (requires Stripe CLI — brew install stripe/stripe-cli/stripe)
 //
-// TODO (Phase 3 — Persistence):
-//   Replace console.log calls with writes to a store so the admin
-//   dashboard can display real payment history. Candidates:
-//     - Supabase table "stripe_events" with RLS
-//     - Upstash Redis (append-only log)
-//     - Simple JSON file in /data/ (fine for <1000 events)
-//   After persistence: map NormalizedStripeEvent fields to Lead
-//   pipeline updates in app/admin/page.tsx:
-//     checkout.session.completed  → create/update Lead at "Paid" stage
+// Persistence (Phase 2B — active):
+//   After verifying the Stripe signature and normalizing the event,
+//   the normalized payload is POSTed to the Stripe Events GAS script
+//   (STRIPE_EVENTS_GAS_URL). The GAS script writes the event to the
+//   "Stripe Events" sheet tab. Missing or unavailable GAS URL is
+//   non-fatal — the webhook always returns 200 to Stripe.
+//
+// TODO (Phase 3 — Pipeline automation):
+//   Map NormalizedStripeEvent fields to Lead pipeline updates in
+//   app/admin/page.tsx after persistence is confirmed working:
+//     checkout.session.completed  → advance Lead to "Paid" stage
 //     subscription.created        → set Lead.stripeStatus = "active"
 //     subscription.deleted        → set Lead.stripeStatus = "cancelled"
 //     invoice.payment_failed      → set Lead.stripeStatus = "past_due"
@@ -27,7 +29,61 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
-import { stripe, normalizeStripeEvent, HANDLED_EVENTS } from "@/lib/stripe";
+import { stripe, normalizeStripeEvent, toGasPayload, HANDLED_EVENTS } from "@/lib/stripe";
+import type { GasStripePayload } from "@/lib/stripe";
+
+// ─────────────────────────────────────────────────────────────
+// GAS PERSISTENCE HELPER
+// Posts the normalized event to the Stripe Events GAS script.
+// Enforces a 3-second timeout so a slow/down GAS endpoint never
+// delays the 200 response back to Stripe. All errors are logged
+// and swallowed — Stripe must not retry because of GAS issues.
+// ─────────────────────────────────────────────────────────────
+
+async function persistToGas(gasUrl: string, payload: GasStripePayload): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 3000);
+
+  try {
+    const res = await fetch(gasUrl, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(payload),
+      signal:  controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      console.error(`[Stripe Webhook] GAS write HTTP ${res.status} — event not persisted`);
+      return;
+    }
+
+    const body = await res.json().catch(() => ({})) as {
+      ok?: boolean;
+      duplicate?: boolean;
+      error?: string;
+      eventId?: string;
+    };
+
+    if (body.duplicate) {
+      console.log(`[Stripe Webhook] Duplicate event ignored by GAS: ${payload.rawEventId}`);
+    } else if (body.ok) {
+      console.log(`[Stripe Webhook] GAS persisted event: ${payload.rawEventId}`);
+    } else {
+      console.error("[Stripe Webhook] GAS write returned ok:false —", body.error);
+    }
+  } catch (err) {
+    clearTimeout(timer);
+    if (err instanceof Error && err.name === "AbortError") {
+      console.error("[Stripe Webhook] GAS write timed out after 3s — skipping persistence");
+    } else {
+      console.error(
+        "[Stripe Webhook] GAS write threw:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+}
 
 // Never cache — every webhook POST must be processed fresh
 export const dynamic = "force-dynamic";
@@ -125,6 +181,17 @@ export async function POST(req: NextRequest) {
       // Log non-handled events without error — Stripe sends many event types
       console.log(`[Stripe Webhook] Unhandled event type: ${event.type} — ignoring`);
       break;
+  }
+
+  // 7. Persist to Google Sheets via GAS (non-blocking, non-fatal)
+  const gasUrl = process.env.STRIPE_EVENTS_GAS_URL;
+  if (gasUrl) {
+    await persistToGas(gasUrl, toGasPayload(normalized));
+  } else {
+    console.log(
+      "[Stripe Webhook] STRIPE_EVENTS_GAS_URL not set — " +
+      "event logged to console only. See env.local.example.",
+    );
   }
 
   // Always return 200 so Stripe doesn't retry
