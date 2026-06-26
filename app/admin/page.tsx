@@ -154,6 +154,126 @@ const TASKS: Task[] = [
 ];
 
 /* ────────────────────────────────────────────────────────────
+   STRIPE RECONCILIATION
+   Merges live Stripe Event rows from Google Sheets into the
+   base pipeline data — activating leads whose payment has been
+   confirmed. The base LEADS/TASKS arrays are never mutated;
+   reconcileWithStripeEvents always returns new objects.
+
+   Matching priority:
+     1. customerEmail in Stripe row matches lead.email directly
+     2. customerEmail maps to a known lead name via KNOWN_EMAIL_MAP
+     (packageName fallback intentionally omitted — too ambiguous)
+──────────────────────────────────────────────────────────── */
+
+// Add entries here as client emails become known.
+// Format: "email@domain.com": "Exact Lead Name in dashboard"
+const KNOWN_EMAIL_MAP: Record<string, string> = {
+  "magg3@icloud.com": "Maggie Eaker",
+};
+
+// Event types that confirm payment / active subscription
+const SUCCESS_EVENT_TYPES = new Set([
+  "checkout.session.completed",
+  "invoice.paid",
+  "customer.subscription.created",
+  "customer.subscription.updated",
+]);
+
+function isSuccessfulPaymentRow(row: SheetRow): boolean {
+  const type = String(row.eventType ?? "").trim();
+  if (!SUCCESS_EVENT_TYPES.has(type)) return false;
+  // subscription.updated only counts when Stripe reports the sub as active
+  if (type === "customer.subscription.updated") {
+    const sub = String(row.subscriptionStatus ?? "").trim();
+    return sub === "active" || sub === "trialing";
+  }
+  return true;
+}
+
+function reconcileWithStripeEvents(
+  baseLeads: Lead[],
+  baseTasks: Task[],
+  stripeRows: SheetRow[],
+): { leads: Lead[]; tasks: Task[] } {
+  // Collect all emails confirmed as paid
+  const paidEmails = new Set<string>();
+  for (const row of stripeRows) {
+    if (!isSuccessfulPaymentRow(row)) continue;
+    const email = String(row.customerEmail ?? "").trim().toLowerCase();
+    if (email) paidEmails.add(email);
+  }
+  if (paidEmails.size === 0) return { leads: baseLeads, tasks: baseTasks };
+
+  const paidLeadIds = new Set<number>();
+  const leads: Lead[] = baseLeads.map(lead => {
+    // 1. Direct email match
+    const directEmail = lead.email.trim().toLowerCase();
+    let matched = directEmail !== "—" && paidEmails.has(directEmail);
+
+    // 2. Known-email-map fallback
+    if (!matched) {
+      for (const [knownEmail, knownName] of Object.entries(KNOWN_EMAIL_MAP)) {
+        if (paidEmails.has(knownEmail.toLowerCase()) && lead.name === knownName) {
+          matched = true;
+          break;
+        }
+      }
+    }
+
+    if (!matched) return lead;
+    paidLeadIds.add(lead.id);
+
+    const nextAction =
+      lead.onboardingStatus === "started"
+        ? "Review onboarding submission and build program"
+        : lead.onboardingStatus === "complete"
+        ? "Onboarding complete — begin program delivery"
+        : "Send onboarding questionnaire — payment confirmed via Stripe";
+
+    return {
+      ...lead,
+      stripeStatus: "active" as StripeStatus,
+      pipelineStatus: "Paid" as PipelineStatus,
+      nextAction,
+      enrolledDate:
+        lead.enrolledDate === "—"
+          ? new Date().toLocaleDateString("en-US", {
+              month: "short", day: "numeric", year: "numeric",
+            })
+          : lead.enrolledDate,
+    };
+  });
+
+  // Remove "Confirm Payment" tasks for leads now confirmed paid
+  const paidNames = new Set(leads.filter(l => paidLeadIds.has(l.id)).map(l => l.name));
+  const keptTasks = baseTasks.filter(
+    t => !(t.type === "Confirm Payment" && paidNames.has(t.clientName)),
+  );
+
+  // Add "Send Onboarding" tasks for newly activated leads
+  let nextId = baseTasks.reduce((m, t) => Math.max(m, t.id), 0) + 1;
+  const newTasks: Task[] = [];
+  for (const lead of leads.filter(l => paidLeadIds.has(l.id))) {
+    const alreadyQueued = keptTasks.some(
+      t => t.clientName === lead.name && t.type === "Send Onboarding",
+    );
+    if (!alreadyQueued) {
+      newTasks.push({
+        id: nextId++,
+        priority: "high",
+        type: "Send Onboarding",
+        clientName: lead.name,
+        description: `Payment confirmed via Stripe — send onboarding questionnaire to ${lead.name}`,
+        due: "Today",
+      });
+    }
+  }
+
+  return { leads, tasks: [...keptTasks, ...newTasks] };
+}
+
+/* ────────────────────────────────────────────────────────────
    PIPELINE STAGES (ordered)
 ──────────────────────────────────────────────────────────── */
 
@@ -261,19 +381,6 @@ function programLabel(s: ProgramStatus) {
 }
 
 /* ────────────────────────────────────────────────────────────
-   COMPUTED METRICS
-──────────────────────────────────────────────────────────── */
-
-const activeClients    = LEADS.filter(l => l.pipelineStatus === "Active Client").length;
-const confirmedMrr     = LEADS.filter(l => l.stripeStatus === "active").reduce((s, l) => s + l.rate, 0);
-const pendingMrr       = LEADS.filter(l => l.stripeStatus === "pending").reduce((s, l) => s + l.rate, 0);
-const newApplications  = LEADS.filter(l => l.pipelineStatus === "Applied").length;
-const programsDue      = LEADS.filter(l => l.programStatus === "not_built" && l.stripeStatus === "active").length;
-const paymentIssues    = LEADS.filter(l => l.stripeStatus === "past_due").length;
-
-const urgentTasks = TASKS.filter(t => t.priority === "urgent").length;
-
-/* ────────────────────────────────────────────────────────────
    SMALL UI ATOMS
 ──────────────────────────────────────────────────────────── */
 
@@ -295,14 +402,14 @@ function Check({ ok }: { ok: boolean }) {
    OVERVIEW TAB
 ──────────────────────────────────────────────────────────── */
 
-function OverviewTab() {
-  const urgent = TASKS.filter(t => t.priority === "urgent" || t.priority === "high");
-  const flagged = LEADS.filter(l => l.flags.length > 0);
+function OverviewTab({ leads = LEADS, tasks = TASKS }: { leads?: Lead[]; tasks?: Task[] }) {
+  const urgent = tasks.filter(t => t.priority === "urgent" || t.priority === "high");
+  const flagged = leads.filter(l => l.flags.length > 0);
 
   // Stage counts
   const stageCounts = PIPELINE_STAGES.map(s => ({
     stage: s,
-    count: LEADS.filter(l => l.pipelineStatus === s).length,
+    count: leads.filter(l => l.pipelineStatus === s).length,
   })).filter(s => s.count > 0);
 
   return (
@@ -371,23 +478,23 @@ function OverviewTab() {
    PIPELINE TAB
 ──────────────────────────────────────────────────────────── */
 
-function PipelineTab() {
-  const populated = PIPELINE_STAGES.filter(s => LEADS.some(l => l.pipelineStatus === s));
+function PipelineTab({ leads = LEADS }: { leads?: Lead[] }) {
+  const populated = PIPELINE_STAGES.filter(s => leads.some(l => l.pipelineStatus === s));
 
   return (
     <div className="space-y-6">
       {populated.map(stage => {
-        const leads = LEADS.filter(l => l.pipelineStatus === stage);
+        const stageLeads = leads.filter(l => l.pipelineStatus === stage);
         return (
           <div key={stage}>
             <div className="flex items-center gap-3 mb-3">
               <span className={`px-2 py-0.5 text-[10px] font-semibold tracking-wide rounded-sm ${pipeCls(stage)}`}>
                 {stage}
               </span>
-              <span className="text-gray-700 text-xs">{leads.length} {leads.length === 1 ? "lead" : "leads"}</span>
+              <span className="text-gray-700 text-xs">{stageLeads.length} {stageLeads.length === 1 ? "lead" : "leads"}</span>
             </div>
             <div className="space-y-2 pl-1">
-              {leads.map(l => (
+              {stageLeads.map(l => (
                 <div key={l.id}
                   className={`bg-[#0d0e0f] border border-white/[0.05] border-l-2 ${pipeBorder(l.pipelineStatus)} px-4 py-3`}>
                   <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
@@ -429,8 +536,8 @@ function PipelineTab() {
    CLIENTS TAB
 ──────────────────────────────────────────────────────────── */
 
-function ClientsTab() {
-  const clients = LEADS;
+function ClientsTab({ leads = LEADS }: { leads?: Lead[] }) {
+  const clients = leads;
 
   return (
     <div className="overflow-x-auto -mx-4 md:mx-0">
@@ -485,10 +592,13 @@ function ClientsTab() {
          stripe.subscriptions.list() and stripe.customers.list()
 ──────────────────────────────────────────────────────────── */
 
-function RevenueTab() {
-  const confirmed = LEADS.filter(l => l.stripeStatus === "active");
-  const pending   = LEADS.filter(l => l.stripeStatus === "pending");
-  const avgValue  = confirmed.length ? Math.round(confirmedMrr / confirmed.length) : 0;
+function RevenueTab({ leads = LEADS }: { leads?: Lead[] }) {
+  const confirmed     = leads.filter(l => l.stripeStatus === "active");
+  const pending       = leads.filter(l => l.stripeStatus === "pending");
+  const confirmedMrr  = confirmed.reduce((s, l) => s + l.rate, 0);
+  const pendingMrr    = pending.reduce((s, l) => s + l.rate, 0);
+  const paymentIssues = leads.filter(l => l.stripeStatus === "past_due").length;
+  const avgValue      = confirmed.length ? Math.round(confirmedMrr / confirmed.length) : 0;
 
   const confirmedBreakdown: { label: string; count: number; amount: number }[] = (
     ["Executive Performance", "Standard", "Founding Member", "Legacy"] as Package[]
@@ -553,7 +663,7 @@ function RevenueTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.03]">
-              {LEADS.filter(l => l.stripeStatus === "active" || l.stripeStatus === "past_due").map(l => (
+              {leads.filter(l => l.stripeStatus === "active" || l.stripeStatus === "past_due").map(l => (
                 <tr key={l.id} className={`hover:bg-white/[0.015] ${l.stripeStatus === "past_due" ? "bg-red-500/[0.03]" : ""}`}>
                   <td className="px-3 py-2.5 text-white font-medium">{l.name}</td>
                   <td className="px-3 py-2.5"><Badge cls={pkgCls(l.package)} text={l.package} /></td>
@@ -619,32 +729,32 @@ function RevenueTab() {
    ONBOARDING TAB
 ──────────────────────────────────────────────────────────── */
 
-function OnboardingTab() {
+function OnboardingTab({ leads = LEADS }: { leads?: Lead[] }) {
   const groups: { label: string; color: string; items: Lead[] }[] = [
     {
       label: "Paid — Onboarding Not Started",
       color: "border-l-amber-500/60",
-      items: LEADS.filter(l => l.stripeStatus === "active" && l.onboardingStatus === "not_started"),
+      items: leads.filter(l => l.stripeStatus === "active" && l.onboardingStatus === "not_started"),
     },
     {
       label: "Onboarding In Progress",
       color: "border-l-teal-500/60",
-      items: LEADS.filter(l => l.onboardingStatus === "started"),
+      items: leads.filter(l => l.onboardingStatus === "started"),
     },
     {
       label: "Onboarding Complete — Program Due",
       color: "border-l-orange-500/60",
-      items: LEADS.filter(l => l.onboardingStatus === "complete" && l.programStatus === "not_built"),
+      items: leads.filter(l => l.onboardingStatus === "complete" && l.programStatus === "not_built"),
     },
     {
       label: "Program Active",
       color: "border-l-emerald-400/70",
-      items: LEADS.filter(l => l.programStatus === "active"),
+      items: leads.filter(l => l.programStatus === "active"),
     },
     {
       label: "Onboarding Complete",
       color: "border-l-cyan-500/60",
-      items: LEADS.filter(l => l.onboardingStatus === "complete" && l.programStatus !== "not_built"),
+      items: leads.filter(l => l.onboardingStatus === "complete" && l.programStatus !== "not_built"),
     },
   ].filter(g => g.items.length > 0);
 
@@ -681,8 +791,8 @@ function OnboardingTab() {
    TASKS TAB
 ──────────────────────────────────────────────────────────── */
 
-function TasksTab() {
-  const sorted = [...TASKS].sort((a, b) => {
+function TasksTab({ tasks = TASKS }: { tasks?: Task[] }) {
+  const sorted = [...tasks].sort((a, b) => {
     const order: Record<Priority, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
     return order[a.priority] - order[b.priority];
   });
@@ -1507,6 +1617,38 @@ const TABS: { id: Tab; label: string }[] = [
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("overview");
+  // Reconciled pipeline data — starts as base (manual) data, updated if Stripe Events load
+  const [leads, setLeads] = useState<Lead[]>(LEADS);
+  const [tasks, setTasks]  = useState<Task[]>(TASKS);
+  const [dataSource, setDataSource] = useState<"loading" | "live" | "manual">("loading");
+
+  useEffect(() => {
+    let mounted = true;
+    // Fetch Stripe Events from GAS via the existing /api/sheets proxy.
+    // All setState calls are inside .then() (async) — satisfies the lint rule.
+    fetchSheetData("stripe-events").then(result => {
+      if (!mounted) return;
+      if (result.ok && result.rows.length > 0) {
+        const reconciled = reconcileWithStripeEvents(LEADS, TASKS, result.rows);
+        setLeads(reconciled.leads);
+        setTasks(reconciled.tasks);
+        setDataSource("live");
+      } else {
+        // Stripe Events not configured or empty — keep base data, show manual state
+        setDataSource("manual");
+      }
+    });
+    return () => { mounted = false; };
+  }, []); // run once on mount
+
+  // Compute all dashboard metrics from reconciled state
+  // "active clients" = Stripe-active (paying) subscribers
+  const activeClients   = leads.filter(l => l.stripeStatus === "active").length;
+  const confirmedMrr    = leads.filter(l => l.stripeStatus === "active").reduce((s, l) => s + l.rate, 0);
+  const newApplications = leads.filter(l => l.pipelineStatus === "Applied").length;
+  const programsDue     = leads.filter(l => l.programStatus === "not_built" && l.stripeStatus === "active").length;
+  const paymentIssues   = leads.filter(l => l.stripeStatus === "past_due").length;
+  const urgentTasks     = tasks.filter(t => t.priority === "urgent").length;
 
   const now = new Date().toLocaleDateString("en-US", {
     weekday: "short", month: "long", day: "numeric", year: "numeric",
@@ -1547,13 +1689,13 @@ export default function AdminPage() {
       <div className="max-w-screen-xl mx-auto px-4 md:px-8 py-6">
 
         {/* ── STAT CARDS ─────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-3">
           {[
-            { label: "Active Clients",   value: activeClients,                    suffix: "",      warn: false,              gold: false },
-            { label: "Confirmed MRR",   value: `$${confirmedMrr.toLocaleString()}`, suffix: "/mo",   warn: false,              gold: true  },
-            { label: "New Applications",value: newApplications,                   suffix: "",      warn: false,              gold: false },
-            { label: "Programs Due",    value: programsDue,                       suffix: "",      warn: programsDue > 0,    gold: false },
-            { label: "Payment Issues",  value: paymentIssues,                     suffix: "",      warn: paymentIssues > 0,  gold: false },
+            { label: "Active Clients",   value: activeClients,                      suffix: "",     warn: false,             gold: false },
+            { label: "Confirmed MRR",    value: `$${confirmedMrr.toLocaleString()}`, suffix: "/mo",  warn: false,             gold: true  },
+            { label: "New Applications", value: newApplications,                     suffix: "",     warn: false,             gold: false },
+            { label: "Programs Due",     value: programsDue,                         suffix: "",     warn: programsDue > 0,   gold: false },
+            { label: "Payment Issues",   value: paymentIssues,                       suffix: "",     warn: paymentIssues > 0, gold: false },
           ].map(({ label, value, suffix, warn, gold }) => (
             <div key={label} className="bg-[#0d0e0f] border border-white/[0.06] px-4 py-4 relative overflow-hidden">
               <div className="h-px w-full absolute top-0 left-0 right-0 bg-gradient-to-r from-transparent via-[#C9A24D]/20 to-transparent" />
@@ -1563,6 +1705,33 @@ export default function AdminPage() {
               <p className="text-[10px] text-gray-600 uppercase tracking-[0.35em] leading-relaxed">{label}</p>
             </div>
           ))}
+        </div>
+
+        {/* ── DATA SOURCE NOTE ─────────────────────────────── */}
+        <div className="flex items-center gap-2 mb-6">
+          {dataSource === "loading" && (
+            <>
+              <div className="w-1.5 h-1.5 rounded-full bg-gray-600 animate-pulse" />
+              <p className="text-[10px] text-gray-700">Loading Stripe Events…</p>
+            </>
+          )}
+          {dataSource === "live" && (
+            <>
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <p className="text-[10px] text-gray-600">
+                Manual pipeline{" "}
+                <span className="text-emerald-600/80">+ live Stripe Events reconciliation</span>
+              </p>
+            </>
+          )}
+          {dataSource === "manual" && (
+            <>
+              <div className="w-1.5 h-1.5 rounded-full bg-gray-700" />
+              <p className="text-[10px] text-gray-700">
+                Manual pipeline — Stripe Events not yet configured (see Live Sheets tab)
+              </p>
+            </>
+          )}
         </div>
 
         {/* ── TAB BAR ────────────────────────────────────────── */}
@@ -1584,12 +1753,12 @@ export default function AdminPage() {
 
         {/* ── TAB CONTENT ────────────────────────────────────── */}
         <div className="mb-16">
-          {tab === "overview"       && <OverviewTab />}
-          {tab === "pipeline"       && <PipelineTab />}
-          {tab === "clients"        && <ClientsTab />}
-          {tab === "revenue"        && <RevenueTab />}
-          {tab === "onboarding"     && <OnboardingTab />}
-          {tab === "tasks"          && <TasksTab />}
+          {tab === "overview"       && <OverviewTab leads={leads} tasks={tasks} />}
+          {tab === "pipeline"       && <PipelineTab leads={leads} />}
+          {tab === "clients"        && <ClientsTab leads={leads} />}
+          {tab === "revenue"        && <RevenueTab leads={leads} />}
+          {tab === "onboarding"     && <OnboardingTab leads={leads} />}
+          {tab === "tasks"          && <TasksTab tasks={tasks} />}
           {tab === "live-sheets"    && <LiveSheetsTab />}
           {tab === "stripe-events"  && <StripeEventsTab />}
           {tab === "calendly"       && <CalendlyTab />}
