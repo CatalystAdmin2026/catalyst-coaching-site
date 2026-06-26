@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import AdminGate from "@/components/AdminGate";
 import { fetchSheetData, type SheetRow } from "@/lib/sheets";
+import { fetchCalendlyEvents, type CalendlyEvent } from "@/lib/calendly";
 
 /* ────────────────────────────────────────────────────────────
    TYPES
@@ -723,14 +724,17 @@ function TasksTab() {
 
 /* ────────────────────────────────────────────────────────────
    STRIPE EVENTS TAB
-   Phase 2A — webhook route is live, persistence is pending.
+   Phase 2B — webhook route is live, GAS persistence is wired.
+   Events flow: Stripe → /api/stripe/webhook → GAS script →
+                "Stripe Events" sheet tab.
+   Readable via: /api/sheets/stripe-events → Live Sheets tab.
    This tab shows setup instructions and event inventory.
-   No data fetching yet — state is derived from build-time config.
+   No live data fetching here — use Live Sheets tab to see rows.
 
-   TODO (Phase 3 — Persistence):
-     - Create /api/stripe/events GET route that reads persisted events
-     - Fetch and display real event log here
-     - Add "Confirm" action to move pipeline lead to Active Client
+   TODO (Phase 3 — Pipeline automation):
+     - Map incoming Stripe events to Lead pipeline status updates
+     - Auto-create Tasks on invoice.payment_failed
+     - Replace hardcoded Confirmed MRR with live subscription data
 ──────────────────────────────────────────────────────────── */
 
 // Stripe events the webhook listens for — duplicated from lib/stripe.ts
@@ -751,19 +755,21 @@ function StripeEventsTab() {
     <div className="space-y-8">
 
       {/* Status banner */}
-      <div className="bg-amber-500/[0.05] border border-amber-500/20 px-5 py-4 flex items-start gap-3">
-        <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0 animate-pulse" />
+      <div className="bg-emerald-500/[0.04] border border-emerald-500/20 px-5 py-4 flex items-start gap-3">
+        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
         <div>
-          <p className="text-amber-300 text-sm font-semibold tracking-wide mb-0.5">
-            Phase 2A — Webhook Foundation Active
+          <p className="text-emerald-300 text-sm font-semibold tracking-wide mb-0.5">
+            Phase 2B — Webhook + Google Sheets Persistence Active
           </p>
-          <p className="text-amber-400/70 text-xs leading-relaxed">
-            Webhook route is deployed at{" "}
-            <code className="font-mono text-amber-300/90">/api/stripe/webhook</code>.
-            Signature verification and event normalization are ready.
-            <br />
-            <strong className="text-amber-300/80">Persistence is pending (Phase 3)</strong> — events are
-            logged to the server console but not yet stored or displayed here.
+          <p className="text-emerald-400/70 text-xs leading-relaxed">
+            Verified Stripe events are forwarded to the{" "}
+            <code className="font-mono text-emerald-300/90">Stripe Events</code> sheet tab via{" "}
+            <code className="font-mono text-emerald-300/90">STRIPE_EVENTS_GAS_URL</code>.
+            If that variable is not yet set, events are logged to the server console only.
+            <br className="mb-1" />
+            View persisted events in the{" "}
+            <strong className="text-emerald-300/80">Live Sheets tab → Stripe Events section</strong>{" "}
+            once <code className="font-mono text-emerald-300/90">STRIPE_EVENTS_GAS_URL</code> is configured.
           </p>
         </div>
       </div>
@@ -868,19 +874,345 @@ function StripeEventsTab() {
         </ol>
       </div>
 
+      {/* Data flow summary */}
+      <div className="bg-[#0d0e0f] border border-white/[0.04] px-5 py-4">
+        <p className="text-[10px] tracking-[0.5em] text-gray-600 uppercase font-semibold mb-3">
+          Current Data Flow
+        </p>
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-600 font-mono">
+          {[
+            "Stripe Payment",
+            "→ /api/stripe/webhook",
+            "→ Signature verified",
+            "→ Event normalized",
+            "→ STRIPE_EVENTS_GAS_URL (POST)",
+            "→ Google Sheet: Stripe Events tab",
+            "→ /api/sheets/stripe-events (GET)",
+            "→ Live Sheets tab",
+          ].map((step, i) => (
+            <span key={i} className={step.startsWith("→") ? "text-gray-700" : "text-gray-400 font-semibold"}>
+              {step}
+            </span>
+          ))}
+        </div>
+      </div>
+
       {/* Phase 3 preview */}
       <div className="bg-[#0d0e0f] border border-white/[0.04] border-dashed px-5 py-4">
         <p className="text-[10px] tracking-[0.5em] text-gray-700 uppercase font-semibold mb-2">
-          Phase 3 — Persistence (upcoming)
+          Phase 3 — Pipeline Automation (upcoming)
         </p>
         <ul className="space-y-1.5 text-[11px] text-gray-700 leading-relaxed">
-          <li>→ Persist each normalized event to a store (Supabase / Upstash / JSON)</li>
-          <li>→ Add GET /api/stripe/events route to read stored events</li>
-          <li>→ Display live event log in this tab with timestamps and amounts</li>
-          <li>→ Auto-update Lead pipeline status when events arrive</li>
-          <li>→ Replace hardcoded Confirmed MRR with live Stripe subscription data</li>
+          <li>→ Map <code className="font-mono">checkout.session.completed</code> → advance Lead to &quot;Paid&quot; stage</li>
+          <li>→ Map <code className="font-mono">subscription.created</code> → set Lead.stripeStatus = &quot;active&quot;</li>
+          <li>→ Map <code className="font-mono">invoice.payment_failed</code> → auto-create urgent Task</li>
+          <li>→ Replace hardcoded Confirmed MRR with live Stripe subscription totals</li>
+          <li>→ Fill <code className="font-mono">PRICE_ID_TO_PACKAGE</code> in lib/stripe.ts with real price IDs</li>
         </ul>
       </div>
+
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
+   CALENDLY TAB — Phase 3
+   Fetches strategy call events from Calendly via the server-side
+   proxy at /api/calendly/events. The PAT never reaches the browser.
+
+   Requires env vars (see env.local.example):
+     CALENDLY_PERSONAL_ACCESS_TOKEN  — Calendly personal access token
+     CALENDLY_USER_URI               — your Calendly user URI
+
+   TODO (Phase 3 — pipeline reconciliation):
+     - Match inviteeEmail against LEADS array to link calls to pipeline leads
+     - Auto-advance pipeline stage to "Strategy Call Booked" when call is upcoming
+     - Auto-advance to "Strategy Call Completed" after call ends
+     - Surface no-shows as urgent tasks
+──────────────────────────────────────────────────────────── */
+
+type CalendlyLoadState = {
+  status: "loading" | "ok" | "error";
+  upcoming: CalendlyEvent[];
+  recent: CalendlyEvent[];
+  cancelled: CalendlyEvent[];
+  error?: string;
+  unconfigured?: boolean;
+};
+
+const CALENDLY_LOADING: CalendlyLoadState = {
+  status: "loading",
+  upcoming: [],
+  recent: [],
+  cancelled: [],
+};
+
+function fmtCallDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    weekday: "short", month: "short", day: "numeric",
+  });
+}
+
+function fmtCallTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric", minute: "2-digit",
+  });
+}
+
+function CalendlyEventCard({ event }: { event: CalendlyEvent }) {
+  const isUpcoming = event.status === "active";
+  const isCancelled = event.status === "canceled";
+
+  return (
+    <div className="bg-[#0d0e0f] border border-white/[0.06] px-4 py-3 relative overflow-hidden">
+      <div className="h-px absolute top-0 left-0 right-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <span className="text-white text-sm font-semibold truncate">
+              {event.inviteeName || "Unknown Invitee"}
+            </span>
+            {isUpcoming && (
+              <span className="text-[10px] bg-[#C9A24D]/10 text-[#C9A24D] border border-[#C9A24D]/20 px-1.5 py-0.5 shrink-0">
+                Upcoming
+              </span>
+            )}
+            {isCancelled && (
+              <span className="text-[10px] bg-red-500/10 text-red-400 border border-red-500/15 px-1.5 py-0.5 shrink-0">
+                Cancelled
+              </span>
+            )}
+          </div>
+          <p className="text-gray-500 text-xs">
+            {event.inviteeEmail || "—"}
+          </p>
+          <p className="text-gray-700 text-[11px] mt-1">{event.name}</p>
+          {event.cancellationReason && (
+            <p className="text-gray-600 text-[11px] mt-1 italic">
+              Reason: {event.cancellationReason}
+            </p>
+          )}
+        </div>
+        <div className="text-right shrink-0">
+          <p className="text-white/80 text-xs font-medium">{fmtCallDate(event.startTime)}</p>
+          <p className="text-gray-600 text-xs">{fmtCallTime(event.startTime)}</p>
+          {event.location && (
+            <p
+              className="text-gray-700 text-[10px] mt-1 max-w-[180px] truncate"
+              title={event.location}
+            >
+              {event.location.startsWith("http") ? "Video call" : event.location}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CalendlyTab() {
+  // Initial value is "loading" — satisfies react-hooks/set-state-in-effect rule.
+  // setState only called from (a) .then() async callbacks or (b) click handlers.
+  const [data, setData] = useState<CalendlyLoadState>(CALENDLY_LOADING);
+  const [lastFetch, setLastFetch] = useState<string | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  const handleRefresh = () => {
+    setData(CALENDLY_LOADING);
+    setRefreshTick(t => t + 1);
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    fetchCalendlyEvents().then(result => {
+      if (!mounted) return;
+      setData({
+        status: result.ok ? "ok" : "error",
+        upcoming: result.upcoming,
+        recent: result.recent,
+        cancelled: result.cancelled,
+        error: result.error,
+        unconfigured: result.unconfigured,
+      });
+      setLastFetch(new Date().toLocaleTimeString());
+    });
+    return () => { mounted = false; };
+  }, [refreshTick]);
+
+  // Derive suggested next actions from live data
+  const nextActions: string[] = [];
+  if (data.status === "ok") {
+    data.upcoming.forEach(e => {
+      const name = e.inviteeName || "an invitee";
+      nextActions.push(
+        `Prepare for ${name}'s strategy call on ${fmtCallDate(e.startTime)} at ${fmtCallTime(e.startTime)}`,
+      );
+    });
+    data.recent.forEach(e => {
+      const name = e.inviteeName || "an invitee";
+      nextActions.push(
+        `Follow up with ${name} after their strategy call on ${fmtCallDate(e.startTime)}`,
+      );
+    });
+    data.cancelled.forEach(e => {
+      const name = e.inviteeName || "an invitee";
+      nextActions.push(
+        `Reach out to ${name} — cancelled call on ${fmtCallDate(e.startTime)}${e.cancellationReason ? ` (${e.cancellationReason})` : ""}`,
+      );
+    });
+  }
+
+  return (
+    <div className="space-y-8">
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-white text-sm font-semibold tracking-wide">Calendly — Strategy Calls</p>
+          <p className="text-gray-600 text-xs mt-0.5">
+            {lastFetch ? `Last fetched at ${lastFetch}` : "Fetching…"}
+          </p>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={data.status === "loading"}
+          className="text-[11px] tracking-[0.25em] uppercase font-semibold text-gray-500 border border-white/[0.08] px-4 py-2 hover:text-white hover:border-white/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Refresh
+        </button>
+      </div>
+
+      {/* Loading skeleton */}
+      {data.status === "loading" && (
+        <div className="space-y-2">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-16 bg-white/[0.02] animate-pulse" />
+          ))}
+        </div>
+      )}
+
+      {/* Setup-required banner */}
+      {data.status === "error" && data.unconfigured && (
+        <div className="bg-amber-500/[0.05] border border-amber-500/20 px-5 py-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+            <p className="text-amber-400 text-xs font-semibold tracking-wide">Setup Required</p>
+          </div>
+          <p className="text-amber-400/70 text-xs leading-relaxed">
+            Add{" "}
+            <code className="text-amber-300 font-mono text-[11px]">CALENDLY_PERSONAL_ACCESS_TOKEN</code>
+            {" "}and{" "}
+            <code className="text-amber-300 font-mono text-[11px]">CALENDLY_USER_URI</code>
+            {" "}to{" "}
+            <code className="text-amber-300 font-mono text-[11px]">.env.local</code>
+            {" "}to connect your Calendly account.
+            See <code className="text-amber-300 font-mono text-[11px]">env.local.example</code> for step-by-step instructions.
+          </p>
+          <div className="pt-1 space-y-1 text-[11px] text-gray-600">
+            <p>1. Calendly → Settings → Integrations → API &amp; Webhooks → Personal Access Tokens → Create</p>
+            <p>2. Call <code className="text-gray-500 font-mono">GET https://api.calendly.com/users/me</code> with Bearer token to get your User URI</p>
+            <p>3. Paste both values into <code className="text-gray-500 font-mono">.env.local</code> and restart the dev server</p>
+          </div>
+        </div>
+      )}
+
+      {/* Fetch error */}
+      {data.status === "error" && !data.unconfigured && (
+        <div className="bg-red-500/[0.04] border border-red-500/15 px-4 py-3 text-xs text-red-400/80">
+          {data.error ?? "Unknown error fetching Calendly events"}
+        </div>
+      )}
+
+      {/* Live data */}
+      {data.status === "ok" && (
+        <>
+          {/* Stats bar */}
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: "Upcoming Calls",    value: data.upcoming.length,  gold: data.upcoming.length > 0 },
+              { label: "Completed (30d)",   value: data.recent.length,    gold: false },
+              { label: "Cancelled (30d)",   value: data.cancelled.length, warn: data.cancelled.length > 0 },
+            ].map(({ label, value, gold, warn }) => (
+              <div key={label} className="bg-[#0d0e0f] border border-white/[0.06] px-4 py-4 relative overflow-hidden">
+                <div className="h-px absolute top-0 left-0 right-0 bg-gradient-to-r from-transparent via-[#C9A24D]/15 to-transparent" />
+                <p className={`text-2xl font-bold tabular-nums leading-none mb-1.5 ${gold ? "text-[#C9A24D]" : warn ? "text-red-400" : "text-white"}`}>
+                  {value}
+                </p>
+                <p className="text-[10px] text-gray-600 uppercase tracking-[0.35em]">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Upcoming */}
+          <div>
+            <h3 className="text-[10px] tracking-[0.5em] text-gray-600 uppercase font-semibold mb-3">
+              Upcoming Strategy Calls
+            </h3>
+            {data.upcoming.length === 0 ? (
+              <p className="text-gray-700 text-xs py-3">No upcoming calls scheduled.</p>
+            ) : (
+              <div className="space-y-2">
+                {data.upcoming.map(e => <CalendlyEventCard key={e.uri} event={e} />)}
+              </div>
+            )}
+          </div>
+
+          <div className="h-px bg-white/[0.04]" />
+
+          {/* Recent completed */}
+          <div>
+            <h3 className="text-[10px] tracking-[0.5em] text-gray-600 uppercase font-semibold mb-3">
+              Recently Completed Calls
+            </h3>
+            {data.recent.length === 0 ? (
+              <p className="text-gray-700 text-xs py-3">No completed calls in the last 30 days.</p>
+            ) : (
+              <div className="space-y-2">
+                {data.recent.map(e => <CalendlyEventCard key={e.uri} event={e} />)}
+              </div>
+            )}
+          </div>
+
+          <div className="h-px bg-white/[0.04]" />
+
+          {/* Cancelled */}
+          <div>
+            <h3 className="text-[10px] tracking-[0.5em] text-gray-600 uppercase font-semibold mb-3">
+              Cancelled / No-Show Calls
+            </h3>
+            {data.cancelled.length === 0 ? (
+              <p className="text-gray-700 text-xs py-3">No cancellations in the last 30 days.</p>
+            ) : (
+              <div className="space-y-2">
+                {data.cancelled.map(e => <CalendlyEventCard key={e.uri} event={e} />)}
+              </div>
+            )}
+          </div>
+
+          {nextActions.length > 0 && (
+            <>
+              <div className="h-px bg-white/[0.04]" />
+
+              {/* Suggested next actions */}
+              <div>
+                <h3 className="text-[10px] tracking-[0.5em] text-gray-600 uppercase font-semibold mb-3">
+                  Suggested Next Actions
+                </h3>
+                <div className="space-y-2">
+                  {nextActions.slice(0, 10).map((action, i) => (
+                    <div
+                      key={i}
+                      className="flex items-start gap-3 py-2 border-l-2 border-[#C9A24D]/25 pl-3"
+                    >
+                      <p className="text-gray-400 text-xs leading-relaxed">{action}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      )}
 
     </div>
   );
@@ -1031,10 +1363,11 @@ function LiveSheetsTab() {
   // Initial value is "loading" so first render already shows loading skeletons.
   // setState is only called from: (a) .then() async callbacks, (b) the click handler.
   // Neither is a synchronous setState-in-effect — satisfying the lint rule.
-  const [apps,     setApps]     = useState<SheetLoadState>(LOADING_STATE);
-  const [stdOnb,   setStdOnb]   = useState<SheetLoadState>(LOADING_STATE);
-  const [execOnb,  setExecOnb]  = useState<SheetLoadState>(LOADING_STATE);
-  const [lastFetch, setLastFetch] = useState<string | null>(null);
+  const [apps,       setApps]       = useState<SheetLoadState>(LOADING_STATE);
+  const [stdOnb,     setStdOnb]     = useState<SheetLoadState>(LOADING_STATE);
+  const [execOnb,    setExecOnb]    = useState<SheetLoadState>(LOADING_STATE);
+  const [stripeEvts, setStripeEvts] = useState<SheetLoadState>(LOADING_STATE);
+  const [lastFetch,  setLastFetch]  = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
 
   // Click handler sets loading state (event handler — not an effect)
@@ -1042,6 +1375,7 @@ function LiveSheetsTab() {
     setApps(LOADING_STATE);
     setStdOnb(LOADING_STATE);
     setExecOnb(LOADING_STATE);
+    setStripeEvts(LOADING_STATE);
     setRefreshTick(t => t + 1);
   };
 
@@ -1052,7 +1386,8 @@ function LiveSheetsTab() {
       fetchSheetData("applications"),
       fetchSheetData("standard-onboarding"),
       fetchSheetData("executive-onboarding"),
-    ]).then(([appsRes, stdRes, execRes]) => {
+      fetchSheetData("stripe-events"),
+    ]).then(([appsRes, stdRes, execRes, stripeRes]) => {
       if (!mounted) return;
       setApps({
         status: appsRes.ok ? "ok" : "error",
@@ -1071,6 +1406,12 @@ function LiveSheetsTab() {
         rows: execRes.rows,
         error: execRes.error,
         unconfigured: execRes.error?.includes("not set in .env.local"),
+      });
+      setStripeEvts({
+        status: stripeRes.ok ? "ok" : "error",
+        rows: stripeRes.rows,
+        error: stripeRes.error,
+        unconfigured: stripeRes.error?.includes("not set in .env.local"),
       });
       setLastFetch(new Date().toLocaleTimeString());
     });
@@ -1124,6 +1465,15 @@ function LiveSheetsTab() {
         keyPrefix="exec"
       />
 
+      <div className="h-px bg-white/[0.04]" />
+
+      {/* Stripe Events */}
+      <SheetSection
+        title="Stripe Events"
+        state={stripeEvts}
+        keyPrefix="stripe"
+      />
+
     </div>
   );
 }
@@ -1140,7 +1490,8 @@ type Tab =
   | "onboarding"
   | "tasks"
   | "live-sheets"
-  | "stripe-events";
+  | "stripe-events"
+  | "calendly";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview",       label: "Overview" },
@@ -1151,6 +1502,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "tasks",          label: "Tasks" },
   { id: "live-sheets",    label: "Live Sheets" },
   { id: "stripe-events",  label: "Stripe Events" },
+  { id: "calendly",       label: "Calendly" },
 ];
 
 export default function AdminPage() {
@@ -1240,6 +1592,7 @@ export default function AdminPage() {
           {tab === "tasks"          && <TasksTab />}
           {tab === "live-sheets"    && <LiveSheetsTab />}
           {tab === "stripe-events"  && <StripeEventsTab />}
+          {tab === "calendly"       && <CalendlyTab />}
         </div>
 
         {/* ── FUTURE INTEGRATIONS ────────────────────────────── */}
