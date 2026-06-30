@@ -351,11 +351,11 @@ function generate() {
   doc.rect(0, FOOTER_Y, PAGE_W, 2).fill(GOLD);
 
   doc.fillColor(GOLD).fontSize(6).font("Helvetica-Bold")
-     .text("catalyst.coachingelite.com", MARGIN, FOOTER_Y + 8, { lineBreak: false });
+     .text("www.catalystcoachingelite.com", MARGIN, FOOTER_Y + 8, { lineBreak: false });
   doc.fillColor(MID_GRAY).fontSize(6).font("Helvetica")
-     .text("coaching.headcoach@gmail.com", PAGE_W / 2 - 50, FOOTER_Y + 8, { lineBreak: false });
+     .text("catalyst.coaching.headcoach@gmail.com", PAGE_W / 2 - 65, FOOTER_Y + 8, { lineBreak: false });
   doc.fillColor(GOLD).fontSize(5).font("Helvetica")
-     .text("@catalyst.coaching.llc", PAGE_W - MARGIN - 80, FOOTER_Y + 8, { lineBreak: false });
+     .text("@catalystcoachingelite", PAGE_W - MARGIN - 80, FOOTER_Y + 8, { lineBreak: false });
 
   doc.end();
 

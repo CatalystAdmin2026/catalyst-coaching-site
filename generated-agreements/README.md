@@ -70,7 +70,7 @@ These placeholders appear throughout both documents. Replace them at send time (
 ## Placeholders / things to update before going live
 
 - **Logo**: The `C` circle in the header and signature area is a text approximation. Replace with the actual Catalyst Coaching logo image file when available.
-- **Contact info**: Footer shows `catalyst.coachingelite.com` and `coaching.headcoach@gmail.com` — update if these change.
+- **Contact info**: Footer shows `www.catalystcoachingelite.com` and `catalyst.coaching.headcoach@gmail.com` — update if these change.
 - **Agreement language**: Sections 1–19 are ready-to-use but should be reviewed by a licensed attorney before client use.
 - **Emergency Contact (Section 13)**: Currently blank underline fields — can be made into DocuSign Text tags if desired.
 - **`{{Agreement_Version}}`**: Update this field each time the agreement language changes materially.

@@ -318,8 +318,8 @@ function buildDocx() {
     shading: { type: ShadingType.SOLID, color: BLACK },
     alignment: AlignmentType.CENTER,
     children: [
-      new TextRun({ text: "catalyst.coachingelite.com", bold: true, color: GOLD, size: 14, font: "Calibri" }),
-      new TextRun({ text: "   |   coaching.headcoach@gmail.com   |   @catalyst.coaching.llc", color: GRAY, size: 13, font: "Calibri" }),
+      new TextRun({ text: "www.catalystcoachingelite.com", bold: true, color: GOLD, size: 14, font: "Calibri" }),
+      new TextRun({ text: "   |   catalyst.coaching.headcoach@gmail.com   |   @catalystcoachingelite", color: GRAY, size: 13, font: "Calibri" }),
     ],
     spacing: { before: 80, after: 80 },
   });
