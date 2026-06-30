@@ -5,6 +5,7 @@ interface SendAgreementBody {
   clientEmail: string;
   packageName: string;
   monthlyRate: string;
+  monthlyRateLabel: string;
   startDate: string;
   crmId?: string;
 }
@@ -44,13 +45,14 @@ export async function POST(req: NextRequest) {
       { role: "Client", name: body.clientName, email: body.clientEmail },
     ],
     mergeFields: {
-      ClientName:     body.clientName,
-      ClientEmail:    body.clientEmail,
-      PackageName:    body.packageName,
-      MonthlyRate:    body.monthlyRate,
-      StartDate:      body.startDate,
-      CRM_ID:         body.crmId ?? "",
-      Generated_Date: new Date().toISOString().split("T")[0],
+      ClientName:       body.clientName,
+      ClientEmail:      body.clientEmail,
+      PackageName:      body.packageName,
+      MonthlyRate:      body.monthlyRate,
+      MonthlyRateLabel: body.monthlyRateLabel,
+      StartDate:        body.startDate,
+      CRM_ID:           body.crmId ?? "",
+      Generated_Date:   new Date().toISOString().split("T")[0],
     },
   };
 

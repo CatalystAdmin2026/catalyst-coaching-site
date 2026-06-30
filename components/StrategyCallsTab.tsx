@@ -5,6 +5,7 @@ import { fetchCalendlyEvents, type CalendlyEvent } from "@/lib/calendly";
 import { fetchSheetData, type SheetRow } from "@/lib/sheets";
 import {
   COACHING_PACKAGES,
+  PACKAGE_CONFIG,
   AGREEMENT_STATUS_LABELS,
   type AgreementState,
   type AgreementStatus,
@@ -255,17 +256,25 @@ function ApproveModal({
         </p>
 
         <div className="space-y-2 mb-5">
-          {COACHING_PACKAGES.map(pkg => (
-            <button
-              key={pkg}
-              onClick={() => onSelect(pkg)}
-              className="w-full text-left bg-[#141618] border border-white/[0.07] px-4 py-3 hover:border-[#C9A24D]/40 hover:bg-[#C9A24D]/[0.03] transition-colors group"
-            >
-              <span className="text-white text-sm font-medium group-hover:text-[#C9A24D] transition-colors">
-                {pkg}
-              </span>
-            </button>
-          ))}
+          {COACHING_PACKAGES.map(pkg => {
+            const config = PACKAGE_CONFIG[pkg];
+            return (
+              <button
+                key={pkg}
+                onClick={() => onSelect(pkg)}
+                className="w-full text-left bg-[#141618] border border-white/[0.07] px-4 py-3 hover:border-[#C9A24D]/40 hover:bg-[#C9A24D]/[0.03] transition-colors group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-white text-sm font-medium group-hover:text-[#C9A24D] transition-colors">
+                    {pkg}
+                  </span>
+                  <span className="text-gray-600 text-xs group-hover:text-[#C9A24D]/70 transition-colors">
+                    {config.monthlyRateLabel}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
         </div>
 
         <button
@@ -336,16 +345,27 @@ function SendAgreementModal({
 }: {
   lead: StrategyCallLead;
   decision: StrategyCallDecision;
-  onConfirm: (monthlyRate: string, startDate: string) => void;
+  onConfirm: (monthlyRate: string, monthlyRateLabel: string, startDate: string) => void;
   onClose: () => void;
   isSending: boolean;
   error?: string | null;
 }) {
-  const [monthlyRate, setMonthlyRate] = useState("");
   const [startDate, setStartDate] = useState(
     new Date().toISOString().split("T")[0],
   );
-  const canSend = !isSending && monthlyRate.trim().length > 0 && startDate.length > 0;
+  // Rate override — default: locked to package config rate
+  const [isRateOverridden, setIsRateOverridden] = useState(false);
+  const [overrideRate, setOverrideRate] = useState("");
+  // TODO: Future — persist rate override with audit trail (who changed it, when, from what)
+
+  const packageRate      = decision.monthlyRate ?? "";
+  const packageRateLabel = decision.monthlyRateLabel ?? (packageRate ? `$${packageRate}/month` : "");
+  const effectiveRate    = isRateOverridden ? overrideRate.trim() : packageRate;
+  const effectiveLabel   = isRateOverridden
+    ? (overrideRate.trim() ? `$${overrideRate.trim()}/month` : "")
+    : packageRateLabel;
+
+  const canSend = !isSending && effectiveRate.length > 0 && startDate.length > 0;
 
   return (
     <div
@@ -364,26 +384,58 @@ function SendAgreementModal({
           {lead.event.inviteeName || "client"}.
         </p>
 
-        {/* Client summary */}
+        {/* Client + package summary */}
         <div className="bg-[#141618] border border-white/[0.06] px-4 py-3 mb-4 space-y-1.5">
-          <ModalRow label="Client" value={lead.event.inviteeName || "—"} />
+          <ModalRow label="Client"  value={lead.event.inviteeName || "—"} />
           <ModalRow label="Email"   value={lead.event.inviteeEmail || "—"} />
           <ModalRow label="Package" value={decision.package ?? "—"} />
+          <ModalRow label="Rate"    value={packageRateLabel || "—"} />
         </div>
 
-        {/* Monthly rate */}
+        {/* Monthly rate — auto-populated, with optional override */}
         <div className="mb-3">
-          <label className="text-[10px] text-gray-600 uppercase tracking-[0.3em] font-semibold block mb-1.5">
-            Monthly Rate ($)
-          </label>
-          <input
-            type="text"
-            inputMode="numeric"
-            placeholder="e.g. 300"
-            value={monthlyRate}
-            onChange={e => setMonthlyRate(e.target.value)}
-            className="w-full bg-[#141618] border border-white/[0.07] px-3 py-2 text-white text-sm focus:outline-none focus:border-[#C9A24D]/40"
-          />
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-[10px] text-gray-600 uppercase tracking-[0.3em] font-semibold">
+              Monthly Rate
+            </label>
+            {!isRateOverridden ? (
+              <button
+                type="button"
+                onClick={() => { setIsRateOverridden(true); setOverrideRate(packageRate); }}
+                className="text-[10px] text-gray-700 hover:text-gray-400 transition-colors"
+              >
+                Override
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setIsRateOverridden(false); setOverrideRate(""); }}
+                className="text-[10px] text-amber-400/60 hover:text-amber-300 transition-colors"
+              >
+                Use Package Rate
+              </button>
+            )}
+          </div>
+          {isRateOverridden ? (
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="Enter rate"
+              value={overrideRate}
+              onChange={e => setOverrideRate(e.target.value)}
+              className="w-full bg-[#141618] border border-amber-500/30 px-3 py-2 text-amber-300 text-sm focus:outline-none focus:border-amber-500/50"
+            />
+          ) : (
+            <div className="bg-[#141618] border border-white/[0.07] px-3 py-2 text-gray-400 text-sm flex items-center justify-between select-none">
+              <span>{packageRateLabel || "—"}</span>
+              <span className="text-gray-700 text-[10px] uppercase tracking-widest">locked</span>
+            </div>
+          )}
+          {isRateOverridden && (
+            <p className="text-[10px] text-amber-400/60 mt-1">
+              Rate overridden — original: {packageRateLabel}
+            </p>
+          )}
         </div>
 
         {/* Start date */}
@@ -407,7 +459,7 @@ function SendAgreementModal({
         )}
 
         <button
-          onClick={() => onConfirm(monthlyRate, startDate)}
+          onClick={() => onConfirm(effectiveRate, effectiveLabel, startDate)}
           disabled={!canSend}
           className="w-full py-2.5 text-xs font-semibold tracking-[0.2em] uppercase bg-[#C9A24D]/10 text-[#C9A24D] border border-[#C9A24D]/30 hover:bg-[#C9A24D]/20 hover:border-[#C9A24D]/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed mb-2"
         >
@@ -718,7 +770,12 @@ function StrategyCallCard({
                 </p>
                 <p className="text-gray-700">
                   Monthly Rate:{" "}
-                  <span className="text-gray-400">${agreementState.monthlyRate}/mo</span>
+                  <span className={`${agreementState.rateWasOverridden ? "text-amber-400/80" : "text-gray-400"}`}>
+                    {agreementState.monthlyRateLabel}
+                    {agreementState.rateWasOverridden && (
+                      <span className="text-amber-500/60 text-[10px] ml-1">(overridden)</span>
+                    )}
+                  </span>
                 </p>
                 <p className="text-gray-700">
                   Start Date: <span className="text-gray-400">{agreementState.startDate}</span>
@@ -894,12 +951,15 @@ export default function StrategyCallsTab() {
 
   const handlePackageSelect = (pkg: CoachingPackage) => {
     if (!pendingApprovalUri) return;
+    const config = PACKAGE_CONFIG[pkg];
     setDecisions(prev => ({
       ...prev,
       [pendingApprovalUri]: {
-        outcome:   "approved",
-        package:   pkg,
-        decidedAt: new Date().toISOString(),
+        outcome:          "approved",
+        package:          pkg,
+        monthlyRate:      config.monthlyRate,
+        monthlyRateLabel: config.monthlyRateLabel,
+        decidedAt:        new Date().toISOString(),
       },
     }));
     setPendingApprovalUri(null);
@@ -936,7 +996,11 @@ export default function StrategyCallsTab() {
     });
   };
 
-  const handleSendAgreementConfirm = async (monthlyRate: string, startDate: string) => {
+  const handleSendAgreementConfirm = async (
+    monthlyRate: string,
+    monthlyRateLabel: string,
+    startDate: string,
+  ) => {
     const uri = pendingSendAgreementUri;
     if (!uri) return;
 
@@ -957,10 +1021,11 @@ export default function StrategyCallsTab() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          clientName:  lead?.event.inviteeName ?? "",
-          clientEmail: lead?.event.inviteeEmail ?? "",
-          packageName: decision.package,
+          clientName:       lead?.event.inviteeName ?? "",
+          clientEmail:      lead?.event.inviteeEmail ?? "",
+          packageName:      decision.package,
           monthlyRate,
+          monthlyRateLabel,
           startDate,
         }),
       });
@@ -983,12 +1048,14 @@ export default function StrategyCallsTab() {
       setAgreements(prev => ({
         ...prev,
         [uri]: {
-          status:      "sent",
-          packageName: decision.package as NonNullable<typeof decision.package>,
+          status:           "sent",
+          packageName:      decision.package as NonNullable<typeof decision.package>,
           monthlyRate,
+          monthlyRateLabel,
           startDate,
-          sentAt:      new Date().toISOString(),
-          isDryRun:    data.mode === "dry_run",
+          sentAt:           new Date().toISOString(),
+          isDryRun:         data.mode === "dry_run",
+          rateWasOverridden: monthlyRate !== (decision.monthlyRate ?? ""),
         },
       }));
       setPendingSendAgreementUri(null);

@@ -56,9 +56,60 @@ export const COACHING_PACKAGES: CoachingPackage[] = [
   "Executive Performance",
 ];
 
+// Single source of truth for all package metadata.
+// Downstream systems (Stripe, DocuSign) should reference this config.
+export interface PackageConfig {
+  key: CoachingPackage;
+  displayName: string;
+  monthlyRate: string;       // numeric string, e.g. "300"
+  monthlyRateLabel: string;  // formatted label, e.g. "$300/month"
+  // TODO: Future — map each package to its Stripe Price ID for automated payment link generation
+  stripePriceId: string | null;
+  // TODO: Future — map each package to a DocuSign template variant if agreement differs by tier
+  docusignTemplateId: string | null;
+}
+
+export const PACKAGE_CONFIG: Record<CoachingPackage, PackageConfig> = {
+  "Legacy": {
+    key:              "Legacy",
+    displayName:      "Legacy",
+    monthlyRate:      "120",
+    monthlyRateLabel: "$120/month",
+    stripePriceId:    null,
+    docusignTemplateId: null,
+  },
+  "Founding Member": {
+    key:              "Founding Member",
+    displayName:      "Founding Member",
+    monthlyRate:      "150",
+    monthlyRateLabel: "$150/month",
+    stripePriceId:    null,
+    docusignTemplateId: null,
+  },
+  "Standard": {
+    key:              "Standard",
+    displayName:      "Standard",
+    monthlyRate:      "300",
+    monthlyRateLabel: "$300/month",
+    stripePriceId:    null,
+    docusignTemplateId: null,
+  },
+  "Executive Performance": {
+    key:              "Executive Performance",
+    displayName:      "Executive Performance",
+    monthlyRate:      "1500",
+    monthlyRateLabel: "$1,500/month",
+    stripePriceId:    null,
+    docusignTemplateId: null,
+  },
+};
+
 export interface StrategyCallDecision {
   outcome: StrategyCallOutcome;
   package?: CoachingPackage;
+  // Stored at approval time from PACKAGE_CONFIG — avoids repeated lookups downstream
+  monthlyRate?: string;
+  monthlyRateLabel?: string;
   decidedAt: string;
 }
 
@@ -96,11 +147,14 @@ export interface AgreementState {
   status: AgreementStatus;
   packageName: CoachingPackage;
   monthlyRate: string;
+  monthlyRateLabel: string;
   startDate: string;
   sentAt?: string;
   // TODO: Future — real DocuSign envelope ID, persisted to CRM/database
   envelopeId?: string;
   isDryRun?: boolean;
+  // TODO: Future — track rate overrides separately for audit trail
+  rateWasOverridden?: boolean;
 }
 
 export function agreementNextAction(status: AgreementStatus): string {
