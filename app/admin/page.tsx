@@ -60,6 +60,11 @@ interface Task {
   due: string;
 }
 
+interface ReconciliationDiagnostic {
+  reconciledCount: number;
+  unmatchedPaidRows: SheetRow[];
+}
+
 /* ────────────────────────────────────────────────────────────
    CLIENT DATA
    TODO: Replace with live data sources:
@@ -161,17 +166,99 @@ const TASKS: Task[] = [
    confirmed. The base LEADS/TASKS arrays are never mutated;
    reconcileWithStripeEvents always returns new objects.
 
-   Matching priority:
-     1. customerEmail in Stripe row matches lead.email directly
-     2. customerEmail maps to a known lead name via KNOWN_EMAIL_MAP
-     (packageName fallback intentionally omitted — too ambiguous)
+   Matching priority (tried in order for each paid event row):
+     1. Normalized customerEmail matches lead.email directly
+     2. customerEmail found in KNOWN_EMAIL_MAP → lead.name
+     3. customerName found in KNOWN_NAME_ALIASES (full or first token)
+     4. customerName normalized full match against lead.name
+     5. amount matches lead.rate (only when exactly one lead matches)
+
+   Why name matching exists:
+     subscription.created / subscription.updated events do NOT carry
+     customerEmail or customerName in the Stripe payload — only
+     checkout.session.completed and invoice.paid do. Name aliases
+     let us match those events even when email is absent.
 ──────────────────────────────────────────────────────────── */
 
-// Add entries here as client emails become known.
-// Format: "email@domain.com": "Exact Lead Name in dashboard"
+function normalizeEmail(email: string): string {
+  const n = email.trim().toLowerCase();
+  return n === "—" ? "" : n;
+}
+
+function normalizeName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+// Maps normalized Stripe customerEmail → exact lead.name in dashboard.
+// Add an entry whenever a paying client's Stripe email becomes known.
 const KNOWN_EMAIL_MAP: Record<string, string> = {
   "magg3@icloud.com": "Maggie Eaker",
+  // "heather@example.com": "Heather",     ← add when known
+  // "emma@example.com":    "Emma Gentile", ← add when known
+  // "melanie@example.com": "Melanie",      ← add when known
 };
+
+// Maps normalized Stripe customerName (full name or first token) → exact lead.name.
+// Handles common mismatches: "Heather Smith" in Stripe → "Heather" in dashboard.
+// Both full name and first-name-only forms are covered; add new clients here as needed.
+const KNOWN_NAME_ALIASES: Record<string, string> = {
+  "maggie eaker": "Maggie Eaker",
+  "maggie":       "Maggie Eaker",
+  "heather":      "Heather",
+  "emma gentile": "Emma Gentile",
+  "emma":         "Emma Gentile",
+  "melanie":      "Melanie",
+};
+
+// Match a Stripe customerName string to a dashboard lead.
+// Tries: full alias → first-token alias → normalized exact name match.
+function matchStripeNameToLead(customerName: string, leads: Lead[]): Lead | null {
+  if (!customerName.trim()) return null;
+  const normalized = normalizeName(customerName);
+
+  // Full normalized name in alias map
+  const alias = KNOWN_NAME_ALIASES[normalized];
+  if (alias) return leads.find(l => l.name === alias) ?? null;
+
+  // First token in alias map — handles "Heather Smith" → "heather" → "Heather" lead
+  const firstToken = normalized.split(" ")[0];
+  const firstAlias = KNOWN_NAME_ALIASES[firstToken];
+  if (firstAlias) return leads.find(l => l.name === firstAlias) ?? null;
+
+  // Exact normalized full-name match against lead names
+  return leads.find(l => normalizeName(l.name) === normalized) ?? null;
+}
+
+// Given a single paid Stripe event row, return the first matching lead or null.
+function findLeadForPaidRow(row: SheetRow, leads: Lead[]): Lead | null {
+  const email = normalizeEmail(String(row.customerEmail ?? ""));
+  const name  = String(row.customerName ?? "").trim();
+
+  // 1. Direct email match against lead.email
+  if (email) {
+    const direct = leads.find(l => normalizeEmail(l.email) === email);
+    if (direct) return direct;
+  }
+
+  // 2. Email → KNOWN_EMAIL_MAP → lead.name
+  if (email) {
+    const mappedName = KNOWN_EMAIL_MAP[email];
+    if (mappedName) return leads.find(l => l.name === mappedName) ?? null;
+  }
+
+  // 3. Name matching via aliases + normalized exact match
+  const byName = matchStripeNameToLead(name, leads);
+  if (byName) return byName;
+
+  // 4. Amount fallback — only when exactly one lead has this monthly rate (unambiguous)
+  const amount = parseFloat(String(row.amount ?? "0"));
+  if (!isNaN(amount) && amount > 0) {
+    const rateMatches = leads.filter(l => l.rate === Math.round(amount));
+    if (rateMatches.length === 1) return rateMatches[0];
+  }
+
+  return null;
+}
 
 // Event types that confirm payment / active subscription
 const SUCCESS_EVENT_TYPES = new Set([
@@ -196,34 +283,32 @@ function reconcileWithStripeEvents(
   baseLeads: Lead[],
   baseTasks: Task[],
   stripeRows: SheetRow[],
-): { leads: Lead[]; tasks: Task[] } {
-  // Collect all emails confirmed as paid
-  const paidEmails = new Set<string>();
-  for (const row of stripeRows) {
-    if (!isSuccessfulPaymentRow(row)) continue;
-    const email = String(row.customerEmail ?? "").trim().toLowerCase();
-    if (email) paidEmails.add(email);
-  }
-  if (paidEmails.size === 0) return { leads: baseLeads, tasks: baseTasks };
+): { leads: Lead[]; tasks: Task[]; diagnostic: ReconciliationDiagnostic } {
+  const emptyDiag: ReconciliationDiagnostic = { reconciledCount: 0, unmatchedPaidRows: [] };
 
+  // Filter to successful payment / subscription rows only
+  const paidRows = stripeRows.filter(isSuccessfulPaymentRow);
+  if (paidRows.length === 0) return { leads: baseLeads, tasks: baseTasks, diagnostic: emptyDiag };
+
+  // Match each paid row to a lead; collect unmatched rows for the diagnostic
   const paidLeadIds = new Set<number>();
-  const leads: Lead[] = baseLeads.map(lead => {
-    // 1. Direct email match
-    const directEmail = lead.email.trim().toLowerCase();
-    let matched = directEmail !== "—" && paidEmails.has(directEmail);
-
-    // 2. Known-email-map fallback
-    if (!matched) {
-      for (const [knownEmail, knownName] of Object.entries(KNOWN_EMAIL_MAP)) {
-        if (paidEmails.has(knownEmail.toLowerCase()) && lead.name === knownName) {
-          matched = true;
-          break;
-        }
-      }
+  const unmatchedPaidRows: SheetRow[] = [];
+  for (const row of paidRows) {
+    const lead = findLeadForPaidRow(row, baseLeads);
+    if (lead) {
+      paidLeadIds.add(lead.id);
+    } else {
+      unmatchedPaidRows.push(row);
     }
+  }
 
-    if (!matched) return lead;
-    paidLeadIds.add(lead.id);
+  if (paidLeadIds.size === 0) {
+    return { leads: baseLeads, tasks: baseTasks, diagnostic: { reconciledCount: 0, unmatchedPaidRows } };
+  }
+
+  // Build activated lead objects (never mutates baseLeads)
+  const leads: Lead[] = baseLeads.map(lead => {
+    if (!paidLeadIds.has(lead.id)) return lead;
 
     const nextAction =
       lead.onboardingStatus === "started"
@@ -246,7 +331,7 @@ function reconcileWithStripeEvents(
     };
   });
 
-  // Remove "Confirm Payment" tasks for leads now confirmed paid
+  // Remove "Confirm Payment" tasks for activated leads
   const paidNames = new Set(leads.filter(l => paidLeadIds.has(l.id)).map(l => l.name));
   const keptTasks = baseTasks.filter(
     t => !(t.type === "Confirm Payment" && paidNames.has(t.clientName)),
@@ -271,7 +356,11 @@ function reconcileWithStripeEvents(
     }
   }
 
-  return { leads, tasks: [...keptTasks, ...newTasks] };
+  return {
+    leads,
+    tasks: [...keptTasks, ...newTasks],
+    diagnostic: { reconciledCount: paidLeadIds.size, unmatchedPaidRows },
+  };
 }
 
 /* ────────────────────────────────────────────────────────────
@@ -861,9 +950,76 @@ const STRIPE_HANDLED_EVENTS: { type: string; description: string }[] = [
 
 const PROD_WEBHOOK_URL = "https://www.catalystcoachingelite.com/api/stripe/webhook";
 
-function StripeEventsTab() {
+function StripeEventsTab({ diagnostic }: { diagnostic?: ReconciliationDiagnostic }) {
   return (
     <div className="space-y-8">
+
+      {/* ── Reconciliation Audit ── */}
+      {diagnostic && (
+        <div>
+          <h3 className="text-[10px] tracking-[0.5em] text-gray-600 uppercase font-semibold mb-3">
+            Reconciliation Audit
+          </h3>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="bg-[#0d0e0f] border border-white/[0.06] px-4 py-3">
+              <p className={`text-2xl font-bold tabular-nums mb-1 ${diagnostic.reconciledCount > 0 ? "text-emerald-400" : "text-gray-600"}`}>
+                {diagnostic.reconciledCount}
+              </p>
+              <p className="text-[10px] text-gray-600 uppercase tracking-[0.35em]">Leads Reconciled</p>
+            </div>
+            <div className="bg-[#0d0e0f] border border-white/[0.06] px-4 py-3">
+              <p className={`text-2xl font-bold tabular-nums mb-1 ${diagnostic.unmatchedPaidRows.length > 0 ? "text-red-400" : "text-gray-600"}`}>
+                {diagnostic.unmatchedPaidRows.length}
+              </p>
+              <p className="text-[10px] text-gray-600 uppercase tracking-[0.35em]">Unmatched Paid Events</p>
+            </div>
+          </div>
+
+          {diagnostic.unmatchedPaidRows.length === 0 ? (
+            <div className="flex items-center gap-2 bg-emerald-500/[0.04] border border-emerald-500/15 px-4 py-3">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+              <p className="text-emerald-400/80 text-xs">All paid Stripe events matched to dashboard leads.</p>
+            </div>
+          ) : (
+            <div className="bg-amber-500/[0.04] border border-amber-500/20 px-4 py-3 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                <p className="text-amber-400 text-xs font-semibold">
+                  {diagnostic.unmatchedPaidRows.length} paid {diagnostic.unmatchedPaidRows.length === 1 ? "event" : "events"} not matched to any lead
+                </p>
+              </div>
+              <p className="text-amber-400/60 text-[11px] leading-relaxed">
+                Add the email or name below to <code className="text-amber-300 font-mono text-[10px]">KNOWN_EMAIL_MAP</code> or{" "}
+                <code className="text-amber-300 font-mono text-[10px]">KNOWN_NAME_ALIASES</code> in{" "}
+                <code className="text-amber-300 font-mono text-[10px]">app/admin/page.tsx</code>.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[11px] min-w-[480px]">
+                  <thead>
+                    <tr className="border-b border-white/[0.06]">
+                      {["customerEmail", "customerName", "amount", "eventType"].map(h => (
+                        <th key={h} className="px-2 py-1.5 text-left text-[10px] text-gray-700 uppercase tracking-[0.3em] font-semibold whitespace-nowrap">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.03]">
+                    {diagnostic.unmatchedPaidRows.map((row, i) => (
+                      <tr key={i} className="hover:bg-white/[0.015]">
+                        <td className="px-2 py-1.5 text-amber-400/70 font-mono">{String(row.customerEmail || "—")}</td>
+                        <td className="px-2 py-1.5 text-gray-400">{String(row.customerName || "—")}</td>
+                        <td className="px-2 py-1.5 text-gray-400">{row.amount ? `$${row.amount}` : "—"}</td>
+                        <td className="px-2 py-1.5 text-gray-600 font-mono text-[10px]">{String(row.eventType || "—")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Status banner */}
       <div className="bg-emerald-500/[0.04] border border-emerald-500/20 px-5 py-4 flex items-start gap-3">
@@ -1624,6 +1780,7 @@ export default function AdminPage() {
   const [leads, setLeads] = useState<Lead[]>(LEADS);
   const [tasks, setTasks]  = useState<Task[]>(TASKS);
   const [dataSource, setDataSource] = useState<"loading" | "live" | "manual">("loading");
+  const [reconciliationDiag, setReconciliationDiag] = useState<ReconciliationDiagnostic | undefined>(undefined);
 
   useEffect(() => {
     let mounted = true;
@@ -1635,6 +1792,7 @@ export default function AdminPage() {
         const reconciled = reconcileWithStripeEvents(LEADS, TASKS, result.rows);
         setLeads(reconciled.leads);
         setTasks(reconciled.tasks);
+        setReconciliationDiag(reconciled.diagnostic);
         setDataSource("live");
       } else {
         // Stripe Events not configured or empty — keep base data, show manual state
@@ -1764,7 +1922,7 @@ export default function AdminPage() {
           {tab === "onboarding"      && <OnboardingTab leads={leads} />}
           {tab === "tasks"           && <TasksTab tasks={tasks} />}
           {tab === "live-sheets"     && <LiveSheetsTab />}
-          {tab === "stripe-events"   && <StripeEventsTab />}
+          {tab === "stripe-events"   && <StripeEventsTab diagnostic={reconciliationDiag} />}
           {tab === "calendly"        && <CalendlyTab />}
         </div>
 

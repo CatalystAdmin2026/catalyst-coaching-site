@@ -358,7 +358,10 @@ interface StrategyCallCardProps {
   decision: StrategyCallDecision | undefined;
   onApprove: () => void;
   onOutcome: (outcome: Exclude<StrategyCallOutcome, "approved" | "pending">) => void;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
   showActions: boolean;
+  isEditing: boolean;
 }
 
 function StrategyCallCard({
@@ -366,21 +369,29 @@ function StrategyCallCard({
   decision,
   onApprove,
   onOutcome,
+  onStartEdit,
+  onCancelEdit,
   showActions,
+  isEditing,
 }: StrategyCallCardProps) {
   const { event, application, baseStage } = lead;
   const outcome: StrategyCallOutcome = decision?.outcome ?? "pending";
   const border = borderColor(baseStage, outcome);
 
   const displayStage =
-    outcome === "approved"         ? "Approved"
+    outcome === "approved"          ? "Approved"
     : outcome === "needs-follow-up" ? "Needs Follow-Up"
     : outcome === "not-a-fit"       ? "Not a Fit"
     : outcome === "no-show"         ? "No-Show"
     : baseStage;
 
+  // Show action buttons when: pending with showActions=true, OR currently editing
+  const showingActions = (showActions && outcome === "pending") || isEditing;
+  // Show the "Edit Decision" button when a decision exists and we're not already editing
+  const showEditButton = outcome !== "pending" && !isEditing;
+
   const nextAction =
-    outcome !== "pending"
+    outcome !== "pending" && !isEditing
       ? outcomeNextAction(outcome, decision?.package)
       : baseStage === "Strategy Call Booked"
       ? `Prepare for call on ${fmtDate(event.startTime)} at ${fmtTime(event.startTime)}`
@@ -400,8 +411,8 @@ function StrategyCallCard({
               <span className="text-white text-sm font-semibold">
                 {event.inviteeName || "Unknown"}
               </span>
-              <StageBadge stage={displayStage} />
-              {decision?.package && <PackageBadge pkg={decision.package} />}
+              <StageBadge stage={isEditing ? baseStage : displayStage} />
+              {!isEditing && decision?.package && <PackageBadge pkg={decision.package} />}
               {application && (
                 <span className="text-[10px] bg-emerald-500/10 text-emerald-500/70 border border-emerald-500/15 px-1.5 py-0.5">
                   Matched
@@ -445,39 +456,55 @@ function StrategyCallCard({
           <span className="text-gray-500 text-[11px] leading-relaxed">{nextAction}</span>
         </div>
 
-        {/* ── Action buttons — only on completed calls with no decision ── */}
-        {showActions && outcome === "pending" && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              onClick={onApprove}
-              className="px-3 py-1.5 text-[11px] font-semibold tracking-wide bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-500/20 hover:border-emerald-500/40 transition-colors"
-            >
-              Approve Client
-            </button>
-            <button
-              onClick={() => onOutcome("needs-follow-up")}
-              className="px-3 py-1.5 text-[11px] font-semibold tracking-wide bg-yellow-500/10 text-yellow-400 border border-yellow-500/25 hover:bg-yellow-500/20 hover:border-yellow-500/40 transition-colors"
-            >
-              Needs Follow-Up
-            </button>
-            <button
-              onClick={() => onOutcome("not-a-fit")}
-              className="px-3 py-1.5 text-[11px] font-semibold tracking-wide bg-red-500/10 text-red-400 border border-red-500/25 hover:bg-red-500/20 hover:border-red-500/40 transition-colors"
-            >
-              Not a Fit
-            </button>
-            <button
-              onClick={() => onOutcome("no-show")}
-              className="px-3 py-1.5 text-[11px] font-semibold tracking-wide bg-white/[0.04] text-gray-500 border border-white/[0.1] hover:bg-white/[0.07] hover:text-gray-300 transition-colors"
-            >
-              No-Show
-            </button>
+        {/* ── Action buttons ── */}
+        {showingActions && (
+          <div className="mt-3">
+            {isEditing && outcome !== "pending" && (
+              <p className="text-[10px] text-gray-700 uppercase tracking-[0.3em] font-semibold mb-2">
+                Change outcome
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={onApprove}
+                className="px-3 py-1.5 text-[11px] font-semibold tracking-wide bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-500/20 hover:border-emerald-500/40 transition-colors"
+              >
+                Approve Client
+              </button>
+              <button
+                onClick={() => onOutcome("needs-follow-up")}
+                className="px-3 py-1.5 text-[11px] font-semibold tracking-wide bg-yellow-500/10 text-yellow-400 border border-yellow-500/25 hover:bg-yellow-500/20 hover:border-yellow-500/40 transition-colors"
+              >
+                Needs Follow-Up
+              </button>
+              <button
+                onClick={() => onOutcome("not-a-fit")}
+                className="px-3 py-1.5 text-[11px] font-semibold tracking-wide bg-red-500/10 text-red-400 border border-red-500/25 hover:bg-red-500/20 hover:border-red-500/40 transition-colors"
+              >
+                Not a Fit
+              </button>
+              <button
+                onClick={() => onOutcome("no-show")}
+                className="px-3 py-1.5 text-[11px] font-semibold tracking-wide bg-white/[0.04] text-gray-500 border border-white/[0.1] hover:bg-white/[0.07] hover:text-gray-300 transition-colors"
+              >
+                No-Show
+              </button>
+              {/* Cancel edit — only shown when correcting an existing decision */}
+              {isEditing && (
+                <button
+                  onClick={onCancelEdit}
+                  className="px-3 py-1.5 text-[11px] text-gray-700 hover:text-gray-400 transition-colors"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
           </div>
         )}
 
-        {/* ── Outcome display — decision already made ── */}
-        {outcome !== "pending" && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+        {/* ── Outcome display + Edit Decision button ── */}
+        {outcome !== "pending" && !isEditing && (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
             <span className="text-[10px] text-gray-700 uppercase tracking-[0.3em] font-semibold">
               Outcome:
             </span>
@@ -494,15 +521,25 @@ function StrategyCallCard({
                 — {new Date(decision.decidedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
               </span>
             )}
+            {/* Edit Decision — allows correcting a mistake or updating outcome/package */}
+            {/* TODO: Future persistence will save decision changes to CRM/database. */}
+            {showEditButton && (
+              <button
+                onClick={onStartEdit}
+                className="ml-auto text-[11px] text-gray-600 border border-white/[0.07] px-2.5 py-1 hover:text-gray-300 hover:border-white/20 transition-colors"
+              >
+                Edit Decision
+              </button>
+            )}
           </div>
         )}
 
-        {/* ── Timeline — approved clients only ── */}
+        {/* ── Timeline — approved clients only (hidden while editing) ── */}
         {/*
          * TODO — Future automation: Agreement email is sent when client is approved.
          * Wire into outcomeNextAction("approved") → trigger agreement send → advance to "Agreement Sent" stage.
          */}
-        {outcome === "approved" && <ClientTimeline currentStep={2} />}
+        {outcome === "approved" && !isEditing && <ClientTimeline currentStep={2} />}
       </div>
     </div>
   );
@@ -564,6 +601,7 @@ export default function StrategyCallsTab() {
   // Keyed by event.uri — local UI state only (not persisted)
   const [decisions, setDecisions] = useState<Record<string, StrategyCallDecision>>({});
   const [pendingApprovalUri, setPendingApprovalUri] = useState<string | null>(null);
+  const [editingUri, setEditingUri] = useState<string | null>(null);
   const [lastFetch, setLastFetch]   = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
 
@@ -617,6 +655,7 @@ export default function StrategyCallsTab() {
       },
     }));
     setPendingApprovalUri(null);
+    setEditingUri(null);
   };
 
   const handleOutcome = (
@@ -627,6 +666,7 @@ export default function StrategyCallsTab() {
       ...prev,
       [uri]: { outcome, decidedAt: new Date().toISOString() },
     }));
+    setEditingUri(null);
   };
 
   // Build leads from live Calendly data + application matches
@@ -774,6 +814,9 @@ export default function StrategyCallsTab() {
                   onApprove={() => handleApprove(lead.event.uri)}
                   onOutcome={outcome => handleOutcome(lead.event.uri, outcome)}
                   showActions={false}
+                  isEditing={editingUri === lead.event.uri}
+                  onStartEdit={() => setEditingUri(lead.event.uri)}
+                  onCancelEdit={() => setEditingUri(null)}
                 />
               ))}
             </Section>
@@ -794,6 +837,9 @@ export default function StrategyCallsTab() {
                   onApprove={() => handleApprove(lead.event.uri)}
                   onOutcome={outcome => handleOutcome(lead.event.uri, outcome)}
                   showActions={true}
+                  isEditing={editingUri === lead.event.uri}
+                  onStartEdit={() => setEditingUri(lead.event.uri)}
+                  onCancelEdit={() => setEditingUri(null)}
                 />
               ))}
             </Section>
@@ -814,6 +860,9 @@ export default function StrategyCallsTab() {
                   onApprove={() => handleApprove(lead.event.uri)}
                   onOutcome={outcome => handleOutcome(lead.event.uri, outcome)}
                   showActions={false}
+                  isEditing={editingUri === lead.event.uri}
+                  onStartEdit={() => setEditingUri(lead.event.uri)}
+                  onCancelEdit={() => setEditingUri(null)}
                 />
               ))}
             </Section>
@@ -834,6 +883,9 @@ export default function StrategyCallsTab() {
                   onApprove={() => handleApprove(lead.event.uri)}
                   onOutcome={outcome => handleOutcome(lead.event.uri, outcome)}
                   showActions={lead.baseStage === "Strategy Call Completed"}
+                  isEditing={editingUri === lead.event.uri}
+                  onStartEdit={() => setEditingUri(lead.event.uri)}
+                  onCancelEdit={() => setEditingUri(null)}
                 />
               ))}
             </Section>
