@@ -362,6 +362,8 @@ interface StrategyCallCardProps {
   onCancelEdit: () => void;
   showActions: boolean;
   isEditing: boolean;
+  onArchive?: () => void;
+  onRestore?: () => void;
 }
 
 function StrategyCallCard({
@@ -373,6 +375,8 @@ function StrategyCallCard({
   onCancelEdit,
   showActions,
   isEditing,
+  onArchive,
+  onRestore,
 }: StrategyCallCardProps) {
   const { event, application, baseStage } = lead;
   const outcome: StrategyCallOutcome = decision?.outcome ?? "pending";
@@ -540,6 +544,28 @@ function StrategyCallCard({
          * Wire into outcomeNextAction("approved") → trigger agreement send → advance to "Agreement Sent" stage.
          */}
         {outcome === "approved" && !isEditing && <ClientTimeline currentStep={2} />}
+
+        {/* ── Archive / Restore footer ── */}
+        {(onArchive || onRestore) && (
+          <div className="mt-2.5 pt-2 border-t border-white/[0.04] flex items-center">
+            {onArchive && (
+              <button
+                onClick={onArchive}
+                className="text-[11px] text-gray-700 hover:text-gray-400 transition-colors"
+              >
+                Archive Lead
+              </button>
+            )}
+            {onRestore && (
+              <button
+                onClick={onRestore}
+                className="text-[11px] text-gray-600 border border-white/[0.07] px-2.5 py-1 hover:text-gray-300 hover:border-white/20 transition-colors"
+              >
+                Restore Lead
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -595,6 +621,9 @@ const INIT_APPS: AppsState = {
   byEmail: new Map(),
 };
 
+// TODO: Future persistence should save archived lead status to CRM/database.
+const ARCHIVE_STORAGE_KEY = "catalyst_sc_archived_uris";
+
 export default function StrategyCallsTab() {
   const [calendly, setCalendly] = useState<CalendlyState>(INIT_CALENDLY);
   const [apps, setApps]         = useState<AppsState>(INIT_APPS);
@@ -602,6 +631,17 @@ export default function StrategyCallsTab() {
   const [decisions, setDecisions] = useState<Record<string, StrategyCallDecision>>({});
   const [pendingApprovalUri, setPendingApprovalUri] = useState<string | null>(null);
   const [editingUri, setEditingUri] = useState<string | null>(null);
+  // Persisted in localStorage; CRM persistence is a future sprint
+  const [archivedUris, setArchivedUris] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set<string>();
+    try {
+      const raw = localStorage.getItem(ARCHIVE_STORAGE_KEY);
+      return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch {
+      return new Set<string>();
+    }
+  });
+  const [showArchived, setShowArchived] = useState(false);
   const [lastFetch, setLastFetch]   = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
 
@@ -669,6 +709,25 @@ export default function StrategyCallsTab() {
     setEditingUri(null);
   };
 
+  const handleArchive = (uri: string) => {
+    if (editingUri === uri) setEditingUri(null);
+    setArchivedUris(prev => {
+      const next = new Set(prev);
+      next.add(uri);
+      try { localStorage.setItem(ARCHIVE_STORAGE_KEY, JSON.stringify([...next])); } catch { /* storage unavailable */ }
+      return next;
+    });
+  };
+
+  const handleRestore = (uri: string) => {
+    setArchivedUris(prev => {
+      const next = new Set(prev);
+      next.delete(uri);
+      try { localStorage.setItem(ARCHIVE_STORAGE_KEY, JSON.stringify([...next])); } catch { /* storage unavailable */ }
+      return next;
+    });
+  };
+
   // Build leads from live Calendly data + application matches
   function buildLeads(events: CalendlyEvent[], baseStage: StrategyCallLead["baseStage"]): StrategyCallLead[] {
     return events.map(event => ({
@@ -678,16 +737,27 @@ export default function StrategyCallsTab() {
     }));
   }
 
-  const upcomingLeads   = buildLeads(calendly.upcoming,  "Strategy Call Booked");
-  const completedLeads  = buildLeads(calendly.completed, "Strategy Call Completed");
-  const cancelledLeads  = buildLeads(calendly.cancelled, "Cancelled");
+  const allUpcomingLeads  = buildLeads(calendly.upcoming,  "Strategy Call Booked");
+  const allCompletedLeads = buildLeads(calendly.completed, "Strategy Call Completed");
+  const allCancelledLeads = buildLeads(calendly.cancelled, "Cancelled");
 
-  // Unmatched = any event (across all categories) with no application match
+  const upcomingLeads  = allUpcomingLeads.filter(l => !archivedUris.has(l.event.uri));
+  const completedLeads = allCompletedLeads.filter(l => !archivedUris.has(l.event.uri));
+  const cancelledLeads = allCancelledLeads.filter(l => !archivedUris.has(l.event.uri));
+
+  // Unmatched = any active (non-archived) event with no application match
   const unmatchedLeads = [
     ...upcomingLeads,
     ...completedLeads,
     ...cancelledLeads,
   ].filter(l => l.application === null);
+
+  // Archived leads — sourced from all raw event lists so URIs stored in localStorage always resolve
+  const archivedLeads = [
+    ...allUpcomingLeads,
+    ...allCompletedLeads,
+    ...allCancelledLeads,
+  ].filter(l => archivedUris.has(l.event.uri));
 
   // Stats
   const approvedCount = Object.values(decisions).filter(d => d.outcome === "approved").length;
@@ -817,6 +887,7 @@ export default function StrategyCallsTab() {
                   isEditing={editingUri === lead.event.uri}
                   onStartEdit={() => setEditingUri(lead.event.uri)}
                   onCancelEdit={() => setEditingUri(null)}
+                  onArchive={() => handleArchive(lead.event.uri)}
                 />
               ))}
             </Section>
@@ -840,6 +911,7 @@ export default function StrategyCallsTab() {
                   isEditing={editingUri === lead.event.uri}
                   onStartEdit={() => setEditingUri(lead.event.uri)}
                   onCancelEdit={() => setEditingUri(null)}
+                  onArchive={() => handleArchive(lead.event.uri)}
                 />
               ))}
             </Section>
@@ -863,6 +935,7 @@ export default function StrategyCallsTab() {
                   isEditing={editingUri === lead.event.uri}
                   onStartEdit={() => setEditingUri(lead.event.uri)}
                   onCancelEdit={() => setEditingUri(null)}
+                  onArchive={() => handleArchive(lead.event.uri)}
                 />
               ))}
             </Section>
@@ -886,9 +959,55 @@ export default function StrategyCallsTab() {
                   isEditing={editingUri === lead.event.uri}
                   onStartEdit={() => setEditingUri(lead.event.uri)}
                   onCancelEdit={() => setEditingUri(null)}
+                  onArchive={() => handleArchive(lead.event.uri)}
                 />
               ))}
             </Section>
+
+            <div className="h-px bg-white/[0.04]" />
+
+            {/* ── ARCHIVED LEADS ───────────────────────── */}
+            <div>
+              <button
+                onClick={() => setShowArchived(v => !v)}
+                className="flex items-center gap-3 w-full text-left group"
+              >
+                <h3 className="text-[10px] tracking-[0.5em] text-gray-700 uppercase font-semibold group-hover:text-gray-500 transition-colors">
+                  Archived Leads
+                </h3>
+                <span className="text-[10px] text-gray-700 border border-white/[0.07] px-2 py-0.5">
+                  {archivedLeads.length}
+                </span>
+                <span className="text-gray-700 text-[10px] ml-auto group-hover:text-gray-500 transition-colors">
+                  {showArchived ? "▲ Hide" : "▼ Show"}
+                </span>
+              </button>
+
+              {showArchived && (
+                <div className="mt-3">
+                  {archivedLeads.length === 0 ? (
+                    <p className="text-gray-700 text-xs py-3">No archived leads.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {archivedLeads.map(lead => (
+                        <StrategyCallCard
+                          key={`archived-${lead.event.uri}`}
+                          lead={lead}
+                          decision={decisions[lead.event.uri]}
+                          onApprove={() => {}}
+                          onOutcome={() => {}}
+                          showActions={false}
+                          isEditing={false}
+                          onStartEdit={() => {}}
+                          onCancelEdit={() => {}}
+                          onRestore={() => handleRestore(lead.event.uri)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </>
         )}
 
