@@ -5,10 +5,14 @@ import { fetchCalendlyEvents, type CalendlyEvent } from "@/lib/calendly";
 import { fetchSheetData, type SheetRow } from "@/lib/sheets";
 import {
   COACHING_PACKAGES,
+  AGREEMENT_STATUS_LABELS,
+  type AgreementState,
+  type AgreementStatus,
   type CoachingPackage,
   type StrategyCallDecision,
   type StrategyCallOutcome,
   outcomeNextAction,
+  agreementNextAction,
 } from "@/lib/workflow";
 
 /* ────────────────────────────────────────────────────────────
@@ -276,6 +280,153 @@ function ApproveModal({
 }
 
 /* ────────────────────────────────────────────────────────────
+   AGREEMENT STATUS BADGE
+──────────────────────────────────────────────────────────── */
+
+function AgreementStatusBadge({
+  status,
+  isDryRun,
+}: {
+  status: AgreementStatus;
+  isDryRun?: boolean;
+}) {
+  const cls: Record<AgreementStatus, string> = {
+    not_sent:       "bg-gray-500/10 text-gray-500 border border-gray-500/20",
+    sent:           "bg-sky-500/10 text-sky-400 border border-sky-500/20",
+    client_signed:  "bg-violet-500/10 text-violet-400 border border-violet-500/20",
+    awaiting_coach: "bg-amber-500/10 text-amber-400 border border-amber-500/20",
+    fully_executed: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+  };
+  return (
+    <span className="flex items-center gap-1.5 flex-wrap">
+      <span className={`inline-flex px-1.5 py-0.5 text-[10px] font-semibold tracking-wide whitespace-nowrap ${cls[status]}`}>
+        {AGREEMENT_STATUS_LABELS[status]}
+      </span>
+      {isDryRun && (
+        <span className="inline-flex px-1.5 py-0.5 text-[10px] font-semibold tracking-wide whitespace-nowrap bg-amber-500/10 text-amber-400/70 border border-amber-500/15">
+          Dry Run
+        </span>
+      )}
+    </span>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
+   SEND AGREEMENT MODAL
+──────────────────────────────────────────────────────────── */
+
+function ModalRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <span className="text-gray-700 text-[10px] uppercase tracking-[0.25em] font-semibold shrink-0 w-16">
+        {label}
+      </span>
+      <span className="text-gray-300 text-xs truncate">{value}</span>
+    </div>
+  );
+}
+
+function SendAgreementModal({
+  lead,
+  decision,
+  onConfirm,
+  onClose,
+  isSending,
+  error,
+}: {
+  lead: StrategyCallLead;
+  decision: StrategyCallDecision;
+  onConfirm: (monthlyRate: string, startDate: string) => void;
+  onClose: () => void;
+  isSending: boolean;
+  error?: string | null;
+}) {
+  const [monthlyRate, setMonthlyRate] = useState("");
+  const [startDate, setStartDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+  const canSend = !isSending && monthlyRate.trim().length > 0 && startDate.length > 0;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#0d0e0f] border border-white/[0.1] w-full max-w-sm p-6 relative"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="h-px absolute top-0 left-0 right-0 bg-gradient-to-r from-transparent via-[#C9A24D]/30 to-transparent" />
+
+        <p className="text-white font-semibold text-sm mb-0.5">Send Agreement</p>
+        <p className="text-gray-500 text-xs mb-4">
+          Review details before sending the Catalyst Coaching agreement to{" "}
+          {lead.event.inviteeName || "client"}.
+        </p>
+
+        {/* Client summary */}
+        <div className="bg-[#141618] border border-white/[0.06] px-4 py-3 mb-4 space-y-1.5">
+          <ModalRow label="Client" value={lead.event.inviteeName || "—"} />
+          <ModalRow label="Email"   value={lead.event.inviteeEmail || "—"} />
+          <ModalRow label="Package" value={decision.package ?? "—"} />
+        </div>
+
+        {/* Monthly rate */}
+        <div className="mb-3">
+          <label className="text-[10px] text-gray-600 uppercase tracking-[0.3em] font-semibold block mb-1.5">
+            Monthly Rate ($)
+          </label>
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="e.g. 300"
+            value={monthlyRate}
+            onChange={e => setMonthlyRate(e.target.value)}
+            className="w-full bg-[#141618] border border-white/[0.07] px-3 py-2 text-white text-sm focus:outline-none focus:border-[#C9A24D]/40"
+          />
+        </div>
+
+        {/* Start date */}
+        <div className="mb-5">
+          <label className="text-[10px] text-gray-600 uppercase tracking-[0.3em] font-semibold block mb-1.5">
+            Coaching Start Date
+          </label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={e => setStartDate(e.target.value)}
+            className="w-full bg-[#141618] border border-white/[0.07] px-3 py-2 text-white text-sm focus:outline-none focus:border-[#C9A24D]/40"
+          />
+        </div>
+
+        {/* Error / not-configured message */}
+        {error && (
+          <div className="mb-4 bg-amber-500/[0.05] border border-amber-500/20 px-3 py-2.5 text-amber-400/80 text-xs leading-relaxed">
+            {error}
+          </div>
+        )}
+
+        <button
+          onClick={() => onConfirm(monthlyRate, startDate)}
+          disabled={!canSend}
+          className="w-full py-2.5 text-xs font-semibold tracking-[0.2em] uppercase bg-[#C9A24D]/10 text-[#C9A24D] border border-[#C9A24D]/30 hover:bg-[#C9A24D]/20 hover:border-[#C9A24D]/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed mb-2"
+        >
+          {isSending ? "Sending…" : "Send Agreement"}
+        </button>
+
+        <button
+          onClick={onClose}
+          disabled={isSending}
+          className="w-full text-center text-gray-600 text-xs hover:text-gray-400 transition-colors py-1 disabled:opacity-40"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
    APPLICATION MATCH PANEL
 ──────────────────────────────────────────────────────────── */
 
@@ -364,6 +515,8 @@ interface StrategyCallCardProps {
   isEditing: boolean;
   onArchive?: () => void;
   onRestore?: () => void;
+  agreementState?: AgreementState;
+  onSendAgreementClick?: () => void;
 }
 
 function StrategyCallCard({
@@ -377,6 +530,8 @@ function StrategyCallCard({
   isEditing,
   onArchive,
   onRestore,
+  agreementState,
+  onSendAgreementClick,
 }: StrategyCallCardProps) {
   const { event, application, baseStage } = lead;
   const outcome: StrategyCallOutcome = decision?.outcome ?? "pending";
@@ -539,11 +694,58 @@ function StrategyCallCard({
         )}
 
         {/* ── Timeline — approved clients only (hidden while editing) ── */}
-        {/*
-         * TODO — Future automation: Agreement email is sent when client is approved.
-         * Wire into outcomeNextAction("approved") → trigger agreement send → advance to "Agreement Sent" stage.
-         */}
         {outcome === "approved" && !isEditing && <ClientTimeline currentStep={2} />}
+
+        {/* ── Agreement Workflow — approved clients only ── */}
+        {outcome === "approved" && !isEditing && (
+          <div className="mt-3 pt-3 border-t border-white/[0.05]">
+            {/* Status row */}
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span className="text-[10px] text-gray-700 uppercase tracking-[0.35em] font-semibold shrink-0">
+                Agreement
+              </span>
+              <AgreementStatusBadge
+                status={agreementState?.status ?? "not_sent"}
+                isDryRun={agreementState?.isDryRun}
+              />
+            </div>
+
+            {/* Rate / start date — shown once agreement has been sent */}
+            {agreementState && agreementState.status !== "not_sent" && (
+              <div className="text-[11px] space-y-0.5 mb-2">
+                <p className="text-gray-700">
+                  Package: <span className="text-gray-400">{agreementState.packageName}</span>
+                </p>
+                <p className="text-gray-700">
+                  Monthly Rate:{" "}
+                  <span className="text-gray-400">${agreementState.monthlyRate}/mo</span>
+                </p>
+                <p className="text-gray-700">
+                  Start Date: <span className="text-gray-400">{agreementState.startDate}</span>
+                </p>
+              </div>
+            )}
+
+            {/* Next action for the agreement step */}
+            <p className="text-[11px] text-gray-700 mb-2">
+              Next:{" "}
+              <span className="text-gray-500">
+                {agreementNextAction(agreementState?.status ?? "not_sent")}
+              </span>
+            </p>
+
+            {/* Send Agreement button — only shown when agreement not yet sent */}
+            {(!agreementState || agreementState.status === "not_sent") &&
+              onSendAgreementClick && (
+                <button
+                  onClick={onSendAgreementClick}
+                  className="px-3 py-1.5 text-[11px] font-semibold tracking-wide bg-[#C9A24D]/10 text-[#C9A24D] border border-[#C9A24D]/30 hover:bg-[#C9A24D]/20 hover:border-[#C9A24D]/50 transition-colors"
+                >
+                  Send Agreement
+                </button>
+              )}
+          </div>
+        )}
 
         {/* ── Archive / Restore footer ── */}
         {(onArchive || onRestore) && (
@@ -631,6 +833,12 @@ export default function StrategyCallsTab() {
   const [decisions, setDecisions] = useState<Record<string, StrategyCallDecision>>({});
   const [pendingApprovalUri, setPendingApprovalUri] = useState<string | null>(null);
   const [editingUri, setEditingUri] = useState<string | null>(null);
+  // Agreement workflow state — keyed by event.uri
+  // TODO: Future automation: real DocuSign envelope ID should be persisted and tracked via DocuSign webhook.
+  const [agreements, setAgreements] = useState<Record<string, AgreementState>>({});
+  const [pendingSendAgreementUri, setPendingSendAgreementUri] = useState<string | null>(null);
+  const [sendingAgreement, setSendingAgreement] = useState(false);
+  const [sendAgreementError, setSendAgreementError] = useState<string | null>(null);
   // Persisted in localStorage; CRM persistence is a future sprint
   const [archivedUris, setArchivedUris] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set<string>();
@@ -728,6 +936,69 @@ export default function StrategyCallsTab() {
     });
   };
 
+  const handleSendAgreementConfirm = async (monthlyRate: string, startDate: string) => {
+    const uri = pendingSendAgreementUri;
+    if (!uri) return;
+
+    const decision = decisions[uri];
+    if (!decision?.package) {
+      setSendAgreementError("No package selected. Please re-approve the client first.");
+      return;
+    }
+
+    setSendingAgreement(true);
+    setSendAgreementError(null);
+
+    const lead = [...allUpcomingLeads, ...allCompletedLeads, ...allCancelledLeads]
+      .find(l => l.event.uri === uri);
+
+    try {
+      const res = await fetch("/api/docusign/send-agreement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientName:  lead?.event.inviteeName ?? "",
+          clientEmail: lead?.event.inviteeEmail ?? "",
+          packageName: decision.package,
+          monthlyRate,
+          startDate,
+        }),
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        configured: boolean;
+        mode?: string;
+        message: string;
+      };
+
+      if (!data.configured) {
+        setSendAgreementError(
+          "DocuSign is not configured yet. Add DocuSign environment variables before sending real agreements.",
+        );
+        setSendingAgreement(false);
+        return;
+      }
+
+      // TODO: Future automation: real DocuSign envelope ID should be persisted and tracked via DocuSign webhook.
+      setAgreements(prev => ({
+        ...prev,
+        [uri]: {
+          status:      "sent",
+          packageName: decision.package as NonNullable<typeof decision.package>,
+          monthlyRate,
+          startDate,
+          sentAt:      new Date().toISOString(),
+          isDryRun:    data.mode === "dry_run",
+        },
+      }));
+      setPendingSendAgreementUri(null);
+      setSendAgreementError(null);
+    } catch {
+      setSendAgreementError("Network error — please try again.");
+    }
+    setSendingAgreement(false);
+  };
+
   // Build leads from live Calendly data + application matches
   function buildLeads(events: CalendlyEvent[], baseStage: StrategyCallLead["baseStage"]): StrategyCallLead[] {
     return events.map(event => ({
@@ -769,6 +1040,15 @@ export default function StrategyCallsTab() {
         .find(l => l.event.uri === pendingApprovalUri)?.event.inviteeName ?? "")
     : "";
 
+  // Pre-computed lead + decision for the Send Agreement modal
+  const allLeadsFlat = [...allUpcomingLeads, ...allCompletedLeads, ...allCancelledLeads];
+  const pendingSendAgreementLead     = pendingSendAgreementUri
+    ? (allLeadsFlat.find(l => l.event.uri === pendingSendAgreementUri) ?? null)
+    : null;
+  const pendingSendAgreementDecision = pendingSendAgreementUri
+    ? (decisions[pendingSendAgreementUri] ?? null)
+    : null;
+
   const isLoading = calendly.status === "loading" || apps.status === "loading";
 
   return (
@@ -781,6 +1061,23 @@ export default function StrategyCallsTab() {
           onClose={() => setPendingApprovalUri(null)}
         />
       )}
+
+      {/* ── SEND AGREEMENT MODAL ──────────────────────── */}
+      {pendingSendAgreementUri &&
+        pendingSendAgreementLead &&
+        pendingSendAgreementDecision && (
+          <SendAgreementModal
+            lead={pendingSendAgreementLead}
+            decision={pendingSendAgreementDecision}
+            onConfirm={handleSendAgreementConfirm}
+            onClose={() => {
+              setPendingSendAgreementUri(null);
+              setSendAgreementError(null);
+            }}
+            isSending={sendingAgreement}
+            error={sendAgreementError}
+          />
+        )}
 
       <div className="space-y-8">
 
@@ -888,6 +1185,8 @@ export default function StrategyCallsTab() {
                   onStartEdit={() => setEditingUri(lead.event.uri)}
                   onCancelEdit={() => setEditingUri(null)}
                   onArchive={() => handleArchive(lead.event.uri)}
+                  agreementState={agreements[lead.event.uri]}
+                  onSendAgreementClick={() => setPendingSendAgreementUri(lead.event.uri)}
                 />
               ))}
             </Section>
@@ -912,6 +1211,8 @@ export default function StrategyCallsTab() {
                   onStartEdit={() => setEditingUri(lead.event.uri)}
                   onCancelEdit={() => setEditingUri(null)}
                   onArchive={() => handleArchive(lead.event.uri)}
+                  agreementState={agreements[lead.event.uri]}
+                  onSendAgreementClick={() => setPendingSendAgreementUri(lead.event.uri)}
                 />
               ))}
             </Section>
@@ -936,6 +1237,8 @@ export default function StrategyCallsTab() {
                   onStartEdit={() => setEditingUri(lead.event.uri)}
                   onCancelEdit={() => setEditingUri(null)}
                   onArchive={() => handleArchive(lead.event.uri)}
+                  agreementState={agreements[lead.event.uri]}
+                  onSendAgreementClick={() => setPendingSendAgreementUri(lead.event.uri)}
                 />
               ))}
             </Section>
@@ -960,6 +1263,8 @@ export default function StrategyCallsTab() {
                   onStartEdit={() => setEditingUri(lead.event.uri)}
                   onCancelEdit={() => setEditingUri(null)}
                   onArchive={() => handleArchive(lead.event.uri)}
+                  agreementState={agreements[lead.event.uri]}
+                  onSendAgreementClick={() => setPendingSendAgreementUri(lead.event.uri)}
                 />
               ))}
             </Section>
