@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import AdminGate from "@/components/AdminGate";
 import { fetchSheetData, type SheetRow } from "@/lib/sheets";
 import { fetchCalendlyEvents, type CalendlyEvent } from "@/lib/calendly";
+import StrategyCallsTab from "@/components/StrategyCallsTab";
 
 /* ────────────────────────────────────────────────────────────
    TYPES
@@ -1595,6 +1596,7 @@ function LiveSheetsTab() {
 type Tab =
   | "overview"
   | "pipeline"
+  | "strategy-calls"
   | "clients"
   | "revenue"
   | "onboarding"
@@ -1604,15 +1606,16 @@ type Tab =
   | "calendly";
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: "overview",       label: "Overview" },
-  { id: "pipeline",       label: "Pipeline" },
-  { id: "clients",        label: "Clients" },
-  { id: "revenue",        label: "Revenue" },
-  { id: "onboarding",     label: "Onboarding" },
-  { id: "tasks",          label: "Tasks" },
-  { id: "live-sheets",    label: "Live Sheets" },
-  { id: "stripe-events",  label: "Stripe Events" },
-  { id: "calendly",       label: "Calendly" },
+  { id: "overview",        label: "Overview" },
+  { id: "pipeline",        label: "Pipeline" },
+  { id: "strategy-calls",  label: "Strategy Calls" },
+  { id: "clients",         label: "Clients" },
+  { id: "revenue",         label: "Revenue" },
+  { id: "onboarding",      label: "Onboarding" },
+  { id: "tasks",           label: "Tasks" },
+  { id: "live-sheets",     label: "Live Sheets" },
+  { id: "stripe-events",   label: "Stripe Events" },
+  { id: "calendly",        label: "Calendly" },
 ];
 
 export default function AdminPage() {
@@ -1753,15 +1756,16 @@ export default function AdminPage() {
 
         {/* ── TAB CONTENT ────────────────────────────────────── */}
         <div className="mb-16">
-          {tab === "overview"       && <OverviewTab leads={leads} tasks={tasks} />}
-          {tab === "pipeline"       && <PipelineTab leads={leads} />}
-          {tab === "clients"        && <ClientsTab leads={leads} />}
-          {tab === "revenue"        && <RevenueTab leads={leads} />}
-          {tab === "onboarding"     && <OnboardingTab leads={leads} />}
-          {tab === "tasks"          && <TasksTab tasks={tasks} />}
-          {tab === "live-sheets"    && <LiveSheetsTab />}
-          {tab === "stripe-events"  && <StripeEventsTab />}
-          {tab === "calendly"       && <CalendlyTab />}
+          {tab === "overview"        && <OverviewTab leads={leads} tasks={tasks} />}
+          {tab === "pipeline"        && <PipelineTab leads={leads} />}
+          {tab === "strategy-calls"  && <StrategyCallsTab />}
+          {tab === "clients"         && <ClientsTab leads={leads} />}
+          {tab === "revenue"         && <RevenueTab leads={leads} />}
+          {tab === "onboarding"      && <OnboardingTab leads={leads} />}
+          {tab === "tasks"           && <TasksTab tasks={tasks} />}
+          {tab === "live-sheets"     && <LiveSheetsTab />}
+          {tab === "stripe-events"   && <StripeEventsTab />}
+          {tab === "calendly"        && <CalendlyTab />}
         </div>
 
         {/* ── FUTURE INTEGRATIONS ────────────────────────────── */}
