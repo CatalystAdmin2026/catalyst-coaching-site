@@ -153,7 +153,7 @@ async function sendEnvelope(
     const detail = await res.text().catch(() => "(no body)");
     console.error("[DocuSign] Envelope create failed:", res.status, detail);
     throw new Error(
-      "Failed to create DocuSign envelope — verify DOCUSIGN_TEMPLATE_ID and account permissions",
+      `Envelope create failed (${res.status}): ${detail}`
     );
   }
 
