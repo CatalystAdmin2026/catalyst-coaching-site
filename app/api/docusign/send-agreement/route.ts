@@ -114,7 +114,6 @@ async function sendEnvelope(
     tabs: {
       prefillTabs: {
         textTabs: [
-          tab("ClientName",        body.clientName),
           tab("ClientEmail",       body.clientEmail),
           tab("PackageName",       body.packageName),
           tab("MonthlyRate",       body.monthlyRate),
@@ -132,6 +131,11 @@ async function sendEnvelope(
         roleName: "Client",
         name:     body.clientName,
         email:    body.clientEmail,
+        tabs: {
+          textTabs: [
+            tab("ClientName", body.clientName),
+          ],
+        },
       },
       {
         // Coach signs second — Jermaine reviews and finalizes manually in DocuSign
