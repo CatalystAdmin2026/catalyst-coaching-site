@@ -111,21 +111,6 @@ async function sendEnvelope(
     // The new DocuSign template editor marks these fields as "Prefill" fields;
     // the classic editor calls them "Sender" fields. Either way, top-level
     // tabs.prefillTabs is the correct API location — NOT inside a templateRole.
-    tabs: {
-      prefillTabs: {
-        textTabs: [
-          tab("ClientEmail",       body.clientEmail),
-          tab("PackageName",       body.packageName),
-          tab("MonthlyRate",       body.monthlyRate),
-          tab("MonthlyRateLabel",  body.monthlyRateLabel),
-          tab("StartDate",         body.startDate),
-          tab("CRM_ID",            body.crmId ?? ""),
-          tab("Agreement_ID",      agreementId),
-          tab("Agreement_Version", "1.0"),
-          tab("Generated_Date",    generatedDate),
-        ],
-      },
-    },
     templateRoles: [
       {
         roleName: "Client",
@@ -133,7 +118,16 @@ async function sendEnvelope(
         email:    body.clientEmail,
         tabs: {
           textTabs: [
-            tab("ClientName", body.clientName),
+            tab("ClientName",        body.clientName),
+            tab("ClientEmail",       body.clientEmail),
+            tab("PackageName",       body.packageName),
+            tab("MonthlyRate",       body.monthlyRate),
+            tab("MonthlyRateLabel",  body.monthlyRateLabel),
+            tab("StartDate",         body.startDate),
+            tab("CRM_ID",            body.crmId ?? ""),
+            tab("Agreement_ID",      agreementId),
+            tab("Agreement_Version", "1.0"),
+            tab("Generated_Date",    generatedDate),
           ],
         },
       },
