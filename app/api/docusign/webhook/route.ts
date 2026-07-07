@@ -1,5 +1,7 @@
 import crypto from "crypto";
+import { Resend } from "resend";
 import { NextRequest, NextResponse } from "next/server";
+import { PACKAGE_ENROLL_PATHS } from "@/lib/enrollment";
 
 // ── DocuSign Connect payload types (JSON format) ───────────────────────────
 //
@@ -7,12 +9,20 @@ import { NextRequest, NextResponse } from "next/server";
 // JSON format (preferred) uses "event" at the top level; XML uses DocuSignEnvelopeInformation.
 // We parse JSON when the Content-Type includes application/json; otherwise log raw XML.
 
+interface DSTab {
+  tabLabel?: string;
+  value?: string;
+}
+
 interface DSConnectSigner {
   name?: string;
   email?: string;
   roleName?: string;
   status?: string;
   recipientId?: string;
+  tabs?: {
+    textTabs?: DSTab[];
+  };
 }
 
 interface DSConnectPayload {
@@ -87,6 +97,159 @@ function verifyHmac(rawBody: string, secret: string, receivedSig: string): boole
   // timingSafeEqual requires equal-length buffers — unequal length means no match
   if (computedBuf.length !== receivedBuf.length) return false;
   return crypto.timingSafeEqual(computedBuf, receivedBuf);
+}
+
+// ── Activate Coaching email (Sprint 3A) ────────────────────────────────────
+//
+// Sent once, on envelope-completed only, to the Client signer.
+// PackageName is read from the Client's textTabs in the webhook payload —
+// requires DocuSign Connect to have "Include Document Fields" enabled so
+// recipient tab values are present in the envelope-completed JSON body.
+//
+// Non-fatal: a Resend failure logs an error but never blocks the { ok: true }
+// ack back to DocuSign.
+
+const SITE_ORIGIN = "https://www.catalystcoachingelite.com";
+
+async function sendActivateCoachingEmail(
+  clientName: string,
+  clientEmail: string,
+  packageName: string,
+  enrollPath: string,
+): Promise<void> {
+  const apiKey   = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.RESEND_FROM_EMAIL;
+
+  if (!apiKey || !fromEmail) {
+    console.warn("[DocuSign Webhook] RESEND_API_KEY or RESEND_FROM_EMAIL not configured — skipping activate email");
+    return;
+  }
+
+  const enrollUrl = `${SITE_ORIGIN}${enrollPath}`;
+  const firstName = clientName.split(" ")[0] || clientName;
+
+  const resend = new Resend(apiKey);
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Activate Your Catalyst Coaching Membership</title>
+</head>
+<body style="margin:0;padding:0;background:#080909;font-family:Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#080909;padding:48px 24px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+
+          <!-- Gold top rule -->
+          <tr>
+            <td style="height:2px;background:#C9A24D;"></td>
+          </tr>
+
+          <!-- Header -->
+          <tr>
+            <td style="background:#0d0e0f;padding:36px 40px 28px;">
+              <p style="margin:0 0 4px;font-size:10px;letter-spacing:0.45em;text-transform:uppercase;color:#C9A24D;font-weight:600;">
+                Catalyst Coaching
+              </p>
+              <h1 style="margin:0;font-size:28px;font-weight:700;color:#ffffff;text-transform:uppercase;letter-spacing:0.02em;line-height:1.1;">
+                Agreement Complete.
+              </h1>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="background:#0d0e0f;padding:0 40px 36px;">
+              <p style="margin:0 0 20px;font-size:15px;color:#d1d5db;line-height:1.6;">
+                Hi ${firstName},
+              </p>
+              <p style="margin:0 0 20px;font-size:15px;color:#d1d5db;line-height:1.6;">
+                Your Catalyst Coaching agreement is fully executed. The final step is activating your
+                <strong style="color:#ffffff;">${packageName}</strong> coaching membership.
+              </p>
+              <p style="margin:0 0 32px;font-size:15px;color:#d1d5db;line-height:1.6;">
+                Click the button below to complete your enrollment and begin your program.
+              </p>
+
+              <!-- CTA button -->
+              <table cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="background:#C9A24D;">
+                    <a href="${enrollUrl}"
+                       style="display:inline-block;padding:16px 40px;font-size:12px;font-weight:700;
+                              letter-spacing:0.2em;text-transform:uppercase;color:#000000;
+                              text-decoration:none;">
+                      Activate Coaching
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:28px 0 0;font-size:12px;color:#4b5563;line-height:1.5;">
+                Or copy this link into your browser:<br />
+                <a href="${enrollUrl}" style="color:#C9A24D;word-break:break-all;">${enrollUrl}</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="background:#0d0e0f;padding:0 40px;">
+              <div style="height:1px;background:rgba(201,162,77,0.18);"></div>
+            </td>
+          </tr>
+
+          <!-- Signoff -->
+          <tr>
+            <td style="background:#0d0e0f;padding:28px 40px 40px;">
+              <p style="margin:0 0 2px;font-size:13px;font-weight:600;color:#ffffff;font-style:italic;">
+                Jermaine Jones
+              </p>
+              <p style="margin:0 0 1px;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#C9A24D;">
+                Founder &amp; Head Coach
+              </p>
+              <p style="margin:0;font-size:11px;color:#4b5563;letter-spacing:0.05em;">
+                Catalyst Coaching
+              </p>
+            </td>
+          </tr>
+
+          <!-- Gold bottom rule -->
+          <tr>
+            <td style="height:2px;background:#C9A24D;"></td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:20px 0 0;text-align:center;">
+              <p style="margin:0;font-size:10px;color:#374151;letter-spacing:0.05em;">
+                www.catalystcoachingelite.com
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  const { error } = await resend.emails.send({
+    from:    fromEmail,
+    to:      clientEmail,
+    subject: "Your Catalyst Coaching Agreement Is Complete",
+    html,
+  });
+
+  if (error) {
+    console.error("[DocuSign Webhook] Resend error sending activate email:", error.message ?? error);
+  } else {
+    console.log("[DocuSign Webhook] Activate Coaching email sent to:", clientEmail, "| package:", packageName);
+  }
 }
 
 // ── Route handler ──────────────────────────────────────────────────────────
@@ -209,11 +372,43 @@ export async function POST(req: NextRequest) {
   else if (event === "envelope-completed") {
     // Catalyst status: Fully Executed — both parties have signed
     // TODO: Future — update agreement status in CRM/database to "fully_executed" for envelopeId
-    // TODO: Future — trigger Stripe Checkout session or payment link for the client
-    // TODO: Future — email payment link to client after envelope-completed
     // TODO: Future — create client onboarding tasks in task management system
     // TODO: Future — attach signed PDF copy to client folder in Google Drive
     console.log("[DocuSign Webhook] envelope-completed (fully executed):", { envelopeId });
+
+    // ── Sprint 3A: Send Activate Coaching email ────────────────────────────
+    // Extract Client signer details. DocuSign Connect must have "Include Document Fields"
+    // enabled so textTab values (including PackageName) appear in the payload.
+    const clientSigner = signers.find(
+      s => (s.roleName ?? "").toLowerCase() === "client",
+    );
+    const clientEmail   = clientSigner?.email ?? "";
+    const clientName    = clientSigner?.name  ?? "";
+    const packageName   = clientSigner?.tabs?.textTabs
+      ?.find(t => t.tabLabel === "PackageName")
+      ?.value ?? "";
+
+    if (!packageName) {
+      console.warn(
+        "[DocuSign Webhook] envelope-completed: PackageName tab missing from payload — " +
+        "enable 'Include Document Fields' in DocuSign Connect config. Activate email not sent.",
+        { envelopeId },
+      );
+    } else if (!clientEmail) {
+      console.warn("[DocuSign Webhook] envelope-completed: Client signer email missing. Activate email not sent.", { envelopeId });
+    } else {
+      const enrollPath = PACKAGE_ENROLL_PATHS[packageName];
+      if (!enrollPath) {
+        console.warn("[DocuSign Webhook] envelope-completed: No enroll path for package:", packageName, "— activate email not sent.");
+      } else {
+        try {
+          await sendActivateCoachingEmail(clientName, clientEmail, packageName, enrollPath);
+        } catch (err) {
+          // Never let email failure block the DocuSign ack
+          console.error("[DocuSign Webhook] Activate email threw unexpectedly:", err instanceof Error ? err.message : err);
+        }
+      }
+    }
   }
 
   else if (event === "envelope-declined") {

@@ -1,3 +1,12 @@
+// Maps CoachingPackage display name → relative enroll URL path.
+// Used by the DocuSign webhook to generate the Activate Coaching email link.
+export const PACKAGE_ENROLL_PATHS: Record<string, string> = {
+  "Legacy":               "/enroll/legacy",
+  "Founding Member":      "/enroll/founding-member",
+  "Standard":             "/enroll/standard",
+  "Executive Performance": "/enroll/executive-performance",
+};
+
 export const STRIPE_LINKS = {
   standard:       "https://buy.stripe.com/9B66oJcjA5MM7LX3S12wU00",
   foundingMember: "https://buy.stripe.com/eVq4gB5Vc0ss3vH1JT2wU01",

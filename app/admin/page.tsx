@@ -192,10 +192,9 @@ function normalizeName(name: string): string {
 // Maps normalized Stripe customerEmail → exact lead.name in dashboard.
 // Add an entry whenever a paying client's Stripe email becomes known.
 const KNOWN_EMAIL_MAP: Record<string, string> = {
-  "magg3@icloud.com": "Maggie Eaker",
-  // "heather@example.com": "Heather",     ← add when known
-  // "emma@example.com":    "Emma Gentile", ← add when known
-  // "melanie@example.com": "Melanie",      ← add when known
+  "magg3@icloud.com":      "Maggie Eaker",
+  "ekgmedspa@gmail.com":   "Emma Gentile",
+  "hirgrl4life@yahoo.com": "Heather",
 };
 
 // Maps normalized Stripe customerName (full name or first token) → exact lead.name.
