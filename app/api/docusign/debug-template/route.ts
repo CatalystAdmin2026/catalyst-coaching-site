@@ -1,6 +1,6 @@
 // TEMPORARY DEBUG ROUTE — remove before production hardening.
-// Fetches the configured DocuSign template and returns all recipient tabs
-// so field labels (tabLabel / dataLabel) can be inspected against the template editor.
+// Returns every tab in the template — recipient tabs, top-level prefillTabs,
+// and tabs on every recipient group — so field labels can be verified.
 
 import crypto from "crypto";
 import { NextResponse } from "next/server";
@@ -54,32 +54,91 @@ async function fetchAccessToken(jwt: string, authBase: string): Promise<string> 
   return json.access_token;
 }
 
-// ── DocuSign tab shape (partial — only fields we care about) ───────────────
+// ── Types ──────────────────────────────────────────────────────────────────
 
 interface DSTab {
-  tabId?: string;
-  tabLabel?: string;
-  dataLabel?: string;
-  required?: string | boolean;
-  tabType?: string;
+  tabId?:        string;
+  tabLabel?:     string;
+  dataLabel?:    string;
+  required?:     string | boolean;
+  value?:        string;
+  defaultValue?: string;
+  locked?:       string | boolean;
+  shared?:       string | boolean;
   [key: string]: unknown;
 }
 
 interface DSRecipient {
-  roleName?: string;
+  roleName?:    string;
   recipientId?: string;
-  name?: string;
-  email?: string;
-  tabs?: Record<string, DSTab[]>;
+  name?:        string;
+  email?:       string;
+  tabs?:        Record<string, DSTab[]>;
 }
 
 interface DSTemplate {
   templateId?: string;
-  name?: string;
+  name?:       string;
+  // Top-level prefill tabs (new DocuSign template editor stores sender/prefill tabs here,
+  // not under any recipient — this is separate from recipients.signers)
+  prefillTabs?: Record<string, DSTab[]>;
+  // All recipient groups DocuSign supports
   recipients?: {
-    signers?: DSRecipient[];
+    signers?:              DSRecipient[];
+    editors?:              DSRecipient[];
+    agents?:               DSRecipient[];
+    certifiedDeliveries?:  DSRecipient[];
+    inPersonSigners?:      DSRecipient[];
+    intermediaries?:       DSRecipient[];
+    witnesses?:            DSRecipient[];
+    notaries?:             DSRecipient[];
     [key: string]: unknown;
   };
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+const TAB_ARRAY_KEYS = [
+  "textTabs", "signHereTabs", "dateSignedTabs", "fullNameTabs",
+  "emailTabs", "titleTabs", "noteTabs", "checkboxTabs",
+  "radioGroupTabs", "listTabs", "numberTabs", "formulaTabs",
+  "initialHereTabs", "declineTabs", "approveTabs", "prefillTabs",
+];
+
+function flattenTabs(tabs: Record<string, DSTab[]> | undefined, roleLabel: string): object[] {
+  if (!tabs) return [];
+  const out: object[] = [];
+  for (const key of TAB_ARRAY_KEYS) {
+    for (const t of (tabs[key] ?? [])) {
+      out.push({
+        tabType:       key,
+        recipientRole: roleLabel,
+        tabId:         t.tabId        ?? null,
+        tabLabel:      t.tabLabel     ?? null,
+        dataLabel:     t.dataLabel    ?? null,
+        value:         t.value        ?? null,
+        defaultValue:  t.defaultValue ?? null,
+        locked:        t.locked       ?? null,
+        required:      t.required     ?? null,
+        shared:        t.shared       ?? null,
+      });
+    }
+  }
+  return out;
+}
+
+function flattenRecipientGroup(
+  group: DSRecipient[] | undefined,
+  groupName: string,
+): object[] {
+  if (!group?.length) return [];
+  return group.flatMap((r) =>
+    flattenTabs(r.tabs, r.roleName ?? groupName).map((t) => ({
+      ...(t as Record<string, unknown>),
+      recipientGroup: groupName,
+      recipientId:    r.recipientId ?? null,
+    })),
+  );
 }
 
 // ── Route ──────────────────────────────────────────────────────────────────
@@ -113,17 +172,19 @@ export async function GET() {
     const jwt  = buildJWT(integrationKey, userId, authBase, privateKeyPem);
     accessToken = await fetchAccessToken(jwt, authBase);
   } catch (err) {
-    return NextResponse.json(
-      { ok: false, error: String(err) },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: false, error: String(err) }, { status: 500 });
   }
 
-  // Fetch template — include=tabs ensures tab definitions are returned
-  const url = `https://${apiBase}/restapi/v2.1/accounts/${accountId}/templates/${templateId}?include=tabs`;
-  const templateRes = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const baseUrl = `https://${apiBase}/restapi/v2.1/accounts/${accountId}/templates/${templateId}`;
+  const headers = { Authorization: `Bearer ${accessToken}` };
+
+  // Fetch template and dedicated recipients endpoint in parallel.
+  // The main template endpoint carries top-level prefillTabs and recipient tabs.
+  // The recipients endpoint (include=tabs) can surface tabs omitted from the main payload.
+  const [templateRes, recipientsRes] = await Promise.all([
+    fetch(`${baseUrl}?include=tabs`, { headers }),
+    fetch(`${baseUrl}/recipients?include=tabs`, { headers }),
+  ]);
 
   if (!templateRes.ok) {
     const detail = await templateRes.text().catch(() => "(no body)");
@@ -133,45 +194,55 @@ export async function GET() {
     );
   }
 
-  const template = (await templateRes.json()) as DSTemplate;
+  const template    = (await templateRes.json()) as DSTemplate;
+  const recipientsPayload = recipientsRes.ok
+    ? (await recipientsRes.json()) as DSTemplate["recipients"]
+    : null;
 
-  // Flatten all tab arrays from all signers into a single inspectable list
-  const TAB_ARRAY_KEYS = [
-    "textTabs", "signHereTabs", "dateSignedTabs", "fullNameTabs",
-    "emailTabs", "titleTabs", "noteTabs", "checkboxTabs",
-    "radioGroupTabs", "listTabs", "numberTabs", "formulaTabs",
-    "initialHereTabs", "declineTabs", "approveTabs",
-  ];
+  // ── 1. Top-level prefillTabs (new template editor sender / prefill fields) ──
+  // These are NOT attached to any recipient — they live at the template root.
+  const topLevelPrefillTabs = flattenTabs(template.prefillTabs, "sender/prefill").map((t) => ({
+    ...(t as Record<string, unknown>),
+    source: "template.prefillTabs",
+  }));
 
-  const recipients = template.recipients?.signers ?? [];
-  const tabsByRecipient = recipients.map((r) => {
-    const allTabs: object[] = [];
-    for (const key of TAB_ARRAY_KEYS) {
-      const arr = r.tabs?.[key] ?? [];
-      for (const t of arr) {
-        allTabs.push({
-          tabType:       key,
-          recipientRole: r.roleName ?? null,
-          tabId:         t.tabId    ?? null,
-          tabLabel:      t.tabLabel ?? null,
-          dataLabel:     t.dataLabel ?? null,
-          required:      t.required  ?? null,
-        });
-      }
-    }
-    return {
-      roleName:    r.roleName    ?? null,
-      recipientId: r.recipientId ?? null,
-      name:        r.name        ?? null,
-      email:       r.email       ?? null,
-      tabs:        allTabs,
-    };
-  });
+  // ── 2. All recipient groups from the main template payload ─────────────────
+  const r = template.recipients ?? {};
+  const recipientGroupsFromTemplate = [
+    ...flattenRecipientGroup(r.signers,             "signers"),
+    ...flattenRecipientGroup(r.editors,             "editors"),
+    ...flattenRecipientGroup(r.agents,              "agents"),
+    ...flattenRecipientGroup(r.certifiedDeliveries, "certifiedDeliveries"),
+    ...flattenRecipientGroup(r.inPersonSigners,     "inPersonSigners"),
+    ...flattenRecipientGroup(r.intermediaries,      "intermediaries"),
+    ...flattenRecipientGroup(r.witnesses,           "witnesses"),
+    ...flattenRecipientGroup(r.notaries,            "notaries"),
+  ].map((t) => ({ ...(t as Record<string, unknown>), source: "template.recipients" }));
+
+  // ── 3. Recipient tabs from the dedicated /recipients endpoint ──────────────
+  // Same groups, different source — may include tabs the main endpoint omits.
+  const rr = recipientsPayload ?? {};
+  const recipientGroupsFromEndpoint = recipientsPayload ? [
+    ...flattenRecipientGroup((rr as DSTemplate["recipients"])?.signers,             "signers"),
+    ...flattenRecipientGroup((rr as DSTemplate["recipients"])?.editors,             "editors"),
+    ...flattenRecipientGroup((rr as DSTemplate["recipients"])?.agents,              "agents"),
+    ...flattenRecipientGroup((rr as DSTemplate["recipients"])?.certifiedDeliveries, "certifiedDeliveries"),
+    ...flattenRecipientGroup((rr as DSTemplate["recipients"])?.inPersonSigners,     "inPersonSigners"),
+    ...flattenRecipientGroup((rr as DSTemplate["recipients"])?.intermediaries,      "intermediaries"),
+    ...flattenRecipientGroup((rr as DSTemplate["recipients"])?.witnesses,           "witnesses"),
+    ...flattenRecipientGroup((rr as DSTemplate["recipients"])?.notaries,            "notaries"),
+  ].map((t) => ({ ...(t as Record<string, unknown>), source: "GET /recipients" })) : [];
 
   return NextResponse.json({
     ok:         true,
     templateId: template.templateId,
     name:       template.name,
-    recipients: tabsByRecipient,
+    // Tabs grouped by source so it's easy to see where each field lives
+    prefillTabs:              topLevelPrefillTabs,
+    recipientTabsFromTemplate: recipientGroupsFromTemplate,
+    recipientTabsFromEndpoint: recipientGroupsFromEndpoint,
+    // Convenience: raw recipient keys present in the template payload
+    _recipientKeysInTemplate: Object.keys(template.recipients ?? {}),
+    _recipientsEndpointStatus: recipientsRes.status,
   });
 }
