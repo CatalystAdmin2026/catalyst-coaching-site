@@ -141,6 +141,11 @@ async function sendEnvelope(
     ],
   };
 
+  console.log(
+    "[DocuSign] Client textTabs payload:",
+    JSON.stringify(envelopeDefinition.templateRoles?.[0]?.tabs?.textTabs ?? [], null, 2)
+  );
+
   const res = await fetch(
     `https://${apiBase}/restapi/v2.1/accounts/${accountId}/envelopes`,
     {
