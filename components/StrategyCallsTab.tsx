@@ -780,6 +780,14 @@ function StrategyCallCard({
                 <p className="text-gray-700">
                   Start Date: <span className="text-gray-400">{agreementState.startDate}</span>
                 </p>
+                {agreementState.envelopeId && !agreementState.isDryRun && (
+                  <p className="text-gray-700 mt-0.5">
+                    Envelope:{" "}
+                    <span className="font-mono text-[10px] text-gray-600 tracking-tight">
+                      {agreementState.envelopeId}
+                    </span>
+                  </p>
+                )}
               </div>
             )}
 
@@ -1033,6 +1041,7 @@ export default function StrategyCallsTab() {
         ok: boolean;
         configured: boolean;
         mode?: string;
+        envelopeId?: string;
         message: string;
       };
 
@@ -1044,17 +1053,24 @@ export default function StrategyCallsTab() {
         return;
       }
 
-      // TODO: Future automation: real DocuSign envelope ID should be persisted and tracked via DocuSign webhook.
+      if (!data.ok) {
+        setSendAgreementError(data.message ?? "DocuSign error — check server logs.");
+        setSendingAgreement(false);
+        return;
+      }
+
+      // TODO: Future — envelopeId should be persisted to CRM/database and tracked via DocuSign Connect webhook.
       setAgreements(prev => ({
         ...prev,
         [uri]: {
-          status:           "sent",
-          packageName:      decision.package as NonNullable<typeof decision.package>,
+          status:            "sent",
+          packageName:       decision.package as NonNullable<typeof decision.package>,
           monthlyRate,
           monthlyRateLabel,
           startDate,
-          sentAt:           new Date().toISOString(),
-          isDryRun:         data.mode === "dry_run",
+          sentAt:            new Date().toISOString(),
+          envelopeId:        data.envelopeId,
+          isDryRun:          data.mode === "dry_run",
           rateWasOverridden: monthlyRate !== (decision.monthlyRate ?? ""),
         },
       }));

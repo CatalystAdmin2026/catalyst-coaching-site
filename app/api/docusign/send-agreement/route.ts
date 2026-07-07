@@ -124,7 +124,7 @@ async function sendEnvelope(
             tab("MonthlyRate",       body.monthlyRate),
             tab("MonthlyRateLabel",  body.monthlyRateLabel),
             tab("StartDate",         body.startDate),
-            tab("CRM_ID",            body.crmId ?? ""),
+            tab("CRM_ID",            body.crmId || agreementId),
             tab("Agreement_ID",      agreementId),
             tab("Agreement_Version", "1.0"),
             tab("Generated_Date",    generatedDate),
@@ -140,11 +140,6 @@ async function sendEnvelope(
       },
     ],
   };
-
-  console.log(
-    "[DocuSign] Client textTabs payload:",
-    JSON.stringify(envelopeDefinition.templateRoles?.[0]?.tabs?.textTabs ?? [], null, 2)
-  );
 
   const res = await fetch(
     `https://${apiBase}/restapi/v2.1/accounts/${accountId}/envelopes`,
