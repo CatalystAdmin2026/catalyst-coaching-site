@@ -1,8 +1,9 @@
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 
 // ── DocuSign Connect payload types (JSON format) ───────────────────────────
 //
-// DocuSign Connect can deliver events as JSON or XML depending on account config.
+// DocuSign Connect can deliver events as JSON or XML depending on configuration.
 // JSON format (preferred) uses "event" at the top level; XML uses DocuSignEnvelopeInformation.
 // We parse JSON when the Content-Type includes application/json; otherwise log raw XML.
 
@@ -41,7 +42,6 @@ const ENVELOPE_EVENT_STATUS: Record<string, string> = {
   "envelope-voided":    "Voided",
 };
 
-// Identify which recipient just completed, for recipient-completed events
 function classifyRecipientCompleted(signers: DSConnectSigner[]): string {
   const justCompleted = signers.find(s => s.status === "completed");
   if (!justCompleted) return "Client Signed / Awaiting Coach Finalization";
@@ -64,52 +64,111 @@ function logEvent(
   );
 }
 
+// ── HMAC verification ──────────────────────────────────────────────────────
+//
+// DocuSign Connect HMAC-SHA256:
+//   - Secret:  the HMAC secret key configured in DocuSign Connect settings
+//   - Input:   exact raw request body bytes (must be read before JSON parsing)
+//   - Digest:  base64-encoded HMAC-SHA256
+//   - Header:  X-DocuSign-Signature-1 (DocuSign may send multiple numbered headers
+//              if multiple HMAC keys are configured; we check the first one)
+//
+// Reference: https://developers.docusign.com/platform/webhooks/connect/hmac/
+
+function verifyHmac(rawBody: string, secret: string, receivedSig: string): boolean {
+  const computed = crypto
+    .createHmac("sha256", secret)
+    .update(rawBody, "utf8")
+    .digest("base64");
+
+  const computedBuf = Buffer.from(computed);
+  const receivedBuf = Buffer.from(receivedSig);
+
+  // timingSafeEqual requires equal-length buffers — unequal length means no match
+  if (computedBuf.length !== receivedBuf.length) return false;
+  return crypto.timingSafeEqual(computedBuf, receivedBuf);
+}
+
 // ── Route handler ──────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  // ── Security: optional shared secret ──────────────────────────────────
+  // ── Read raw body first — must happen before any req.json() / req.text() call ──
+  // The request body stream can only be consumed once. We read it as text here
+  // so it is available for both HMAC verification and JSON parsing below.
+  let rawBody: string;
+  try {
+    rawBody = await req.text();
+  } catch {
+    console.error("[DocuSign Webhook] Failed to read request body");
+    return NextResponse.json({ ok: true });
+  }
+
+  // ── Security: HMAC-SHA256 verification ────────────────────────────────────
   const webhookSecret = process.env.DOCUSIGN_WEBHOOK_SECRET;
+
   if (webhookSecret) {
-    const incomingSecret = req.headers.get("x-catalyst-webhook-secret");
-    if (incomingSecret !== webhookSecret) {
-      console.warn("[DocuSign Webhook] Unauthorized — secret mismatch");
+    // DocuSign sends the digest in X-DocuSign-Signature-1.
+    // If multiple HMAC keys are configured it also sends -2, -3, etc.
+    // We validate against the first one present.
+    const candidateHeaders = [
+      "x-docusign-signature-1",
+      "x-docusign-signature-2",
+      "x-docusign-signature-3",
+    ];
+
+    // Debug: which signature headers arrived (no values logged)
+    const presentHeaders = candidateHeaders.filter(h => req.headers.get(h) !== null);
+    console.log("[DocuSign Webhook] Signature headers present:", presentHeaders);
+
+    const receivedSig = req.headers.get("x-docusign-signature-1");
+    console.log("[DocuSign Webhook] x-docusign-signature-1 present:", receivedSig !== null);
+
+    if (!receivedSig) {
+      console.warn("[DocuSign Webhook] Unauthorized — X-DocuSign-Signature-1 header missing");
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
+
+    const computed = crypto
+      .createHmac("sha256", webhookSecret)
+      .update(rawBody, "utf8")
+      .digest("base64");
+
+    // Log lengths only — never log the actual signature values or secret
+    console.log("[DocuSign Webhook] Computed signature length:", computed.length);
+    console.log("[DocuSign Webhook] Received signature length:", receivedSig.length);
+
+    if (!verifyHmac(rawBody, webhookSecret, receivedSig)) {
+      console.warn("[DocuSign Webhook] Unauthorized — HMAC mismatch");
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
   } else {
     console.warn("[DocuSign Webhook] DocuSign webhook secret not configured — accepting unauthenticated request");
   }
 
-  // ── Parse body ─────────────────────────────────────────────────────────
+  // ── Parse body from the already-read raw string ────────────────────────────
   const contentType = req.headers.get("content-type") ?? "";
   let payload: DSConnectPayload | null = null;
-  let rawBody = "";
 
   if (contentType.includes("application/json")) {
     try {
-      payload = (await req.json()) as DSConnectPayload;
+      payload = JSON.parse(rawBody) as DSConnectPayload;
     } catch {
       console.error("[DocuSign Webhook] Failed to parse JSON body");
-      return NextResponse.json({ ok: true }); // still ack to prevent DocuSign retries
+      return NextResponse.json({ ok: true }); // ack to prevent DocuSign retries
     }
   } else {
-    // XML or unknown format — read raw text for logging
-    try {
-      rawBody = await req.text();
-    } catch {
-      console.error("[DocuSign Webhook] Failed to read request body");
-    }
-    // Log raw XML for debugging; full XML parsing is a future Sprint 2D task
+    // XML or unknown format — log truncated raw text for debugging
     console.log("[DocuSign Webhook] Non-JSON body received (XML?):", rawBody.slice(0, 500));
     return NextResponse.json({ ok: true });
   }
 
-  // ── Identify event ─────────────────────────────────────────────────────
+  // ── Identify event ─────────────────────────────────────────────────────────
   const event      = payload?.event;
   const envelopeId = payload?.data?.envelopeId
     ?? payload?.data?.envelopeSummary?.envelopeId;
   const signers    = payload?.data?.envelopeSummary?.recipients?.signers ?? [];
 
-  // ── Map event to Catalyst status ───────────────────────────────────────
+  // ── Map event to Catalyst status ───────────────────────────────────────────
   let catalystStatus: string | undefined;
 
   if (event === "recipient-completed") {
@@ -124,7 +183,7 @@ export async function POST(req: NextRequest) {
     signerCount:       signers.length,
   });
 
-  // ── Per-event handling ─────────────────────────────────────────────────
+  // ── Per-event handling ─────────────────────────────────────────────────────
 
   if (event === "envelope-sent") {
     // Catalyst status: Agreement Sent
