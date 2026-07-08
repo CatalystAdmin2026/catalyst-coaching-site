@@ -156,11 +156,21 @@ export function normalizeStripeEvent(event: Stripe.Event): NormalizedStripeEvent
 
 // ─────────────────────────────────────────────────────────────
 // PACKAGE MAPPING
-// Maps Stripe Price IDs to human-readable package names.
-// Fill in the real Price IDs from Stripe Dashboard:
-//   Dashboard → Products → [product] → Pricing → copy the price_... ID
+// Maps Stripe Price IDs → Catalyst package display names.
 //
-// TODO: Populate once Payment Link prices are confirmed in Stripe.
+// How to populate:
+//   1. Go to Stripe Dashboard → Products
+//   2. Open each product and copy the Price ID (price_...)
+//   3. Fill in below — use the EXACT display name from CoachingPackage
+//      in lib/workflow.ts: "Standard" | "Founding Member" | "Legacy"
+//                        | "Executive Performance"
+//
+// Note: checkout.session.completed events do NOT include priceId in the
+// webhook payload by default (line_items must be expanded via an extra
+// Stripe API call). package detection on checkout events will return ""
+// until either:
+//   a) Line items are expanded in the normalizer, or
+//   b) packageName is derived from subscription.created (which does carry priceId).
 // ─────────────────────────────────────────────────────────────
 
 export const PRICE_ID_TO_PACKAGE: Record<string, string> = {
@@ -170,7 +180,7 @@ export const PRICE_ID_TO_PACKAGE: Record<string, string> = {
   // "price_...": "Executive Performance",
 };
 
-/** Returns the package name for a Stripe Price ID, or "" if unknown. */
+/** Returns the package name for a Stripe Price ID, or "" if unknown/unmapped. */
 export function packageFromPriceId(priceId: string | null): string {
   if (!priceId) return "";
   return PRICE_ID_TO_PACKAGE[priceId] ?? "";
