@@ -413,9 +413,13 @@ async function createClientWorkspace(
 
     if (body.ok) {
       console.log(
-        `[Stripe Webhook] Drive workspace ${body.createdOrReused} for:`,
-        clientEmail,
-        "| folderId:", body.folderId,
+        "[Drive Workspace]" +
+        `\n  Client:         ${clientName}` +
+        `\n  Email:          ${clientEmail}` +
+        `\n  Package:        ${packageType || "Unknown"}` +
+        `\n  Created/Reused: ${body.createdOrReused ?? "N/A"}` +
+        `\n  Folder ID:      ${body.folderId  ?? "N/A"}` +
+        `\n  Folder URL:     ${body.folderUrl ?? "N/A"}`,
       );
     } else {
       console.error("[Stripe Webhook] Drive GAS returned ok:false —", body.error);
