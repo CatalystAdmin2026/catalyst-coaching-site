@@ -22,6 +22,10 @@
 //   checkout.session.completed → sendClientWelcomeEmail + sendAdminNotificationEmail
 //   Both emails are non-fatal: failures are logged but never block the 200 ack.
 //
+// Sprint 3B.2 — Google Drive Client Workspace (active):
+//   checkout.session.completed → createClientWorkspace via GAS (drive-workspace-backend.gs)
+//   Non-fatal: failures are logged but never block the 200 ack.
+//
 // TODO (Phase 3 — Pipeline automation):
 //   Map NormalizedStripeEvent fields to Lead pipeline updates in
 //   app/admin/page.tsx after persistence is confirmed working:
@@ -360,12 +364,81 @@ async function sendAdminNotificationEmail(
   }
 }
 
-/** Called once on checkout.session.completed. Fires welcome + admin emails. */
+// ─────────────────────────────────────────────────────────────
+// DRIVE WORKSPACE HELPER — Sprint 3B.2
+//
+// Calls the GAS Drive workspace script (drive-workspace-backend.gs)
+// to find or create a structured Google Drive folder for the client.
+// Enforces a 10-second timeout — GAS folder creation is typically
+// 1–3 seconds but may be slower on cold starts.
+// Non-fatal: errors are logged and never block the webhook ack.
+// ─────────────────────────────────────────────────────────────
+
+async function createClientWorkspace(
+  clientName: string,
+  clientEmail: string,
+  packageType: string,
+): Promise<void> {
+  const gasUrl = process.env.SHEETS_DRIVE_GAS_URL;
+
+  if (!gasUrl) {
+    console.warn("[Stripe Webhook] SHEETS_DRIVE_GAS_URL not configured — skipping Drive workspace creation");
+    return;
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10_000);
+
+  try {
+    const res = await fetch(gasUrl, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ clientName, clientEmail, packageType }),
+      signal:  controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      console.error(`[Stripe Webhook] Drive GAS HTTP ${res.status} — workspace not created`);
+      return;
+    }
+
+    const body = await res.json().catch(() => ({})) as {
+      ok?:             boolean;
+      folderId?:       string;
+      folderUrl?:      string;
+      createdOrReused?: string;
+      error?:          string;
+    };
+
+    if (body.ok) {
+      console.log(
+        `[Stripe Webhook] Drive workspace ${body.createdOrReused} for:`,
+        clientEmail,
+        "| folderId:", body.folderId,
+      );
+    } else {
+      console.error("[Stripe Webhook] Drive GAS returned ok:false —", body.error);
+    }
+  } catch (err) {
+    clearTimeout(timer);
+    if (err instanceof Error && err.name === "AbortError") {
+      console.error("[Stripe Webhook] Drive GAS timed out after 10s — skipping workspace creation");
+    } else {
+      console.error(
+        "[Stripe Webhook] Drive GAS threw:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+}
+
+/** Called once on checkout.session.completed. Fires welcome + admin emails + Drive workspace. */
 async function handleNewEnrollment(normalized: NormalizedStripeEvent): Promise<void> {
   const { customerEmail, customerName, priceId, amountCents, currency, customerId, subscriptionId } = normalized;
 
   if (!customerEmail) {
-    console.warn("[Stripe Webhook] checkout.session.completed has no customerEmail — skipping enrollment emails");
+    console.warn("[Stripe Webhook] checkout.session.completed has no customerEmail — skipping enrollment actions");
     return;
   }
 
@@ -393,6 +466,12 @@ async function handleNewEnrollment(normalized: NormalizedStripeEvent): Promise<v
     );
   } catch (err) {
     console.error("[Stripe Webhook] sendAdminNotificationEmail threw:", err instanceof Error ? err.message : err);
+  }
+
+  try {
+    await createClientWorkspace(displayName, customerEmail, packageName);
+  } catch (err) {
+    console.error("[Stripe Webhook] createClientWorkspace threw:", err instanceof Error ? err.message : err);
   }
 }
 
