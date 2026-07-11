@@ -25,13 +25,19 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
-    setMenuOpen(false);
+    const t = setTimeout(() => setMenuOpen(false), 0);
+    return () => clearTimeout(t);
   }, [pathname]);
 
   const solid = scrolled || menuOpen;
 
-  // Admin dashboard uses its own chrome — suppress public nav entirely
-  if (pathname === "/admin") return null;
+  // Admin, portal, and mission-entry use their own chrome — suppress public nav
+  if (
+    pathname === "/admin" ||
+    pathname.startsWith("/portal") ||
+    pathname.startsWith("/mission-entry")
+  )
+    return null;
 
   return (
     <header

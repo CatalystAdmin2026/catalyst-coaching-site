@@ -8,7 +8,12 @@ export default function Footer() {
   const pathname = usePathname();
   const year = new Date().getFullYear();
 
-  if (pathname === "/admin") return null;
+  if (
+    pathname === "/admin" ||
+    pathname.startsWith("/portal") ||
+    pathname.startsWith("/mission-entry")
+  )
+    return null;
 
   return (
     <footer className="bg-[#080909] border-t border-white/5">
