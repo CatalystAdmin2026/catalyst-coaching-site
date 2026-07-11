@@ -239,7 +239,7 @@ async function sendActivateCoachingEmail(
 </html>`;
 
   const { error } = await resend.emails.send({
-    from:    fromEmail,
+    from:    `Catalyst Coaching <${fromEmail}>`,
     to:      clientEmail,
     subject: "Your Catalyst Coaching Agreement Is Complete",
     html,

@@ -10,25 +10,27 @@
  * ─────────────────────────────────────────────────────────────
  *
  *   Catalyst Clients/
- *     └── 2026/
- *         └── [ClientName] — Catalyst Coaching/
- *             ├── 01 - Workouts
- *             ├── 02 - Nutrition
- *             ├── 03 - Check-ins
- *             ├── 04 - Progress Photos
- *             ├── 05 - Documents
- *             ├── 06 - Coach Notes
- *             ├── 07 - Bloodwork
- *             └── 08 - Progress Reports
+ *     └── [currentYear]/
+ *         └── [packageType]/          e.g. Standard | Executive Performance | Founding Member | Legacy
+ *             └── [ClientName] — Catalyst Coaching/
+ *                 ├── 01 - Workouts
+ *                 ├── 02 - Nutrition
+ *                 ├── 03 - Check-ins
+ *                 ├── 04 - Progress Photos
+ *                 ├── 05 - Documents
+ *                 ├── 06 - Coach Notes
+ *                 ├── 07 - Bloodwork
+ *                 └── 08 - Progress Reports
  *
  * ─────────────────────────────────────────────────────────────
  * IDEMPOTENCY
  * ─────────────────────────────────────────────────────────────
  *
  *   If a folder named "[ClientName] — Catalyst Coaching" already
- *   exists inside the current-year folder, the existing folder URL
- *   is returned immediately and no duplicates are created.
- *   Subfolders that already exist are also reused, not duplicated.
+ *   exists inside the package folder, the existing folder URL is
+ *   returned immediately and no duplicates are created.
+ *   The package folder and all subfolders are also reused if they
+ *   already exist — nothing is ever created twice.
  *
  * ─────────────────────────────────────────────────────────────
  * TRACKING SHEET
@@ -145,19 +147,24 @@ function doPost(e) {
       return jsonOut({ ok: false, error: "clientName and clientEmail are required" });
     }
 
-    var year = String(new Date().getFullYear());
+    var currentYear = String(new Date().getFullYear());
 
     // 1. Find or create root: "Catalyst Clients"
     var rootFolder = findOrCreateFolder(ROOT_FOLDER_NAME, null);
 
-    // 2. Find or create year subfolder: "2026"
-    var yearFolder = findOrCreateFolder(year, rootFolder);
+    // 2. Find or create year subfolder: e.g. "2026", "2027"
+    var yearFolder = findOrCreateFolder(currentYear, rootFolder);
 
-    // 3. Determine client folder name
+    // 3. Find or create package subfolder: "Standard", "Executive Performance", etc.
+    //    Falls back to "Unknown Package" if packageType is blank/unrecognised.
+    var packageFolderName = packageType || "Unknown Package";
+    var packageFolder     = findOrCreateFolder(packageFolderName, yearFolder);
+
+    // 4. Determine client folder name
     var clientFolderName = clientName + " " + CLIENT_FOLDER_SUFFIX;
 
-    // 4. Idempotency — check whether client folder already exists
-    var existingFolders = yearFolder.getFoldersByName(clientFolderName);
+    // 5. Idempotency — check whether client folder already exists inside the package folder
+    var existingFolders = packageFolder.getFoldersByName(clientFolderName);
     var clientFolder;
     var createdOrReused;
 
@@ -165,11 +172,11 @@ function doPost(e) {
       clientFolder    = existingFolders.next();
       createdOrReused = "reused";
     } else {
-      clientFolder    = yearFolder.createFolder(clientFolderName);
+      clientFolder    = packageFolder.createFolder(clientFolderName);
       createdOrReused = "created";
     }
 
-    // 5. Find or create each subfolder (idempotent)
+    // 6. Find or create each subfolder inside the client folder (idempotent)
     for (var i = 0; i < SUBFOLDERS.length; i++) {
       findOrCreateFolder(SUBFOLDERS[i], clientFolder);
     }
@@ -177,7 +184,7 @@ function doPost(e) {
     var folderId  = clientFolder.getId();
     var folderUrl = clientFolder.getUrl();
 
-    // 6. Append tracking row to the active spreadsheet
+    // 7. Append tracking row to the active spreadsheet
     appendTrackingRow(clientName, clientEmail, packageType, folderId, folderUrl, createdOrReused);
 
     return jsonOut({
