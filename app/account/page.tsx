@@ -1,14 +1,22 @@
 // ─────────────────────────────────────────────────────────────
 // Catalyst OS — Account Page
 //
-// Server Component — auth and DB query run server-side.
-// Shows identity information and provides the sign-out control.
-// No profile editing in this sprint.
+// Server Component — auth and DB queries run server-side.
+// Shows identity information, onboarding status, active goals
+// summary, training availability, and nutrition completion.
+// No medical details, injury details, bloodwork, internal notes,
+// raw JSON, or internal IDs are displayed.
 // ─────────────────────────────────────────────────────────────
 
 import Image from "next/image";
 import Link from "next/link";
 import { requireClientUser, getClientProfile } from "@/lib/supabase/session";
+import {
+  getClientGoals,
+  getClientTrainingProfile,
+  getClientNutritionProfile,
+  getLatestOnboardingSubmission,
+} from "@/lib/db/profile-service";
 import LogoutButton from "@/components/portal/LogoutButton";
 
 export const dynamic = "force-dynamic";
@@ -27,9 +35,34 @@ const STATUS_COLORS: Record<string, string> = {
   archived: "text-white/30",
 };
 
+const GOAL_LABELS: Record<string, string> = {
+  fat_loss: "Fat Loss",
+  muscle_gain: "Muscle Gain",
+  body_recomposition: "Body Recomposition",
+  strength: "Strength",
+  athletic_performance: "Athletic Performance",
+  general_health: "General Health",
+  mobility: "Mobility",
+  competition_prep: "Competition Prep",
+  reverse_diet: "Reverse Diet",
+  maintenance: "Maintenance",
+  executive_performance: "Executive Performance",
+  custom: "Custom",
+};
+
 export default async function AccountPage() {
   const { authUser, dbUser } = await requireClientUser();
   const profile = await getClientProfile(dbUser.id);
+
+  // Profile data — all wrapped in safeQuery inside each helper,
+  // so these return gracefully before the migration is applied.
+  const [latestSubmission, activeGoals, trainingProfile, nutritionProfile] =
+    await Promise.all([
+      getLatestOnboardingSubmission(dbUser.id),
+      getClientGoals(dbUser.id),
+      getClientTrainingProfile(dbUser.id),
+      getClientNutritionProfile(dbUser.id),
+    ]);
 
   const initials = (profile?.fullName || authUser.email || "C")
     .split(" ")
@@ -40,6 +73,29 @@ export default async function AccountPage() {
 
   const statusLabel = STATUS_LABELS[dbUser.status] ?? dbUser.status;
   const statusColor = STATUS_COLORS[dbUser.status] ?? "text-white/40";
+
+  // Onboarding status
+  const onboardingLabel = latestSubmission
+    ? latestSubmission.status === "processed"
+      ? "Profile imported"
+      : "Submitted — processing"
+    : "Not yet submitted";
+  const onboardingColor = latestSubmission
+    ? latestSubmission.status === "processed"
+      ? "text-emerald-400/80"
+      : "text-[#c9a24d]/80"
+    : "text-white/30";
+
+  // Training availability
+  const trainingLabel = trainingProfile?.availableDaysPerWeek
+    ? `${trainingProfile.availableDaysPerWeek} day${trainingProfile.availableDaysPerWeek !== 1 ? "s" : ""} per week`
+    : null;
+
+  // Nutrition completion
+  const nutritionComplete =
+    nutritionProfile !== null &&
+    (nutritionProfile.dietaryPattern !== null ||
+      nutritionProfile.allergies !== null);
 
   return (
     <div className="min-h-screen bg-[#080909] text-[#f0efeb]">
@@ -92,7 +148,7 @@ export default async function AccountPage() {
         {/* Gold rule */}
         <div className="h-px w-full bg-[#c9a24d]/10" />
 
-        {/* Details grid */}
+        {/* Identity fields */}
         <div className="flex flex-col gap-6">
           <Field label="Full Name" value={profile?.fullName ?? "—"} />
           <Field
@@ -107,6 +163,72 @@ export default async function AccountPage() {
             </p>
             <p className={`text-sm font-medium ${statusColor}`}>
               {statusLabel}
+            </p>
+          </div>
+        </div>
+
+        {/* Gold rule */}
+        <div className="h-px w-full bg-[#c9a24d]/10" />
+
+        {/* Onboarding & profile section */}
+        <div className="flex flex-col gap-6">
+          <p className="text-[10px] font-semibold tracking-[0.2em] text-white/25 uppercase">
+            Onboarding Profile
+          </p>
+
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[10px] font-semibold tracking-[0.14em] text-white/30 uppercase">
+              Onboarding Status
+            </p>
+            <p className={`text-sm font-medium ${onboardingColor}`}>
+              {onboardingLabel}
+            </p>
+            {!latestSubmission && (
+              <p className="text-xs text-white/25 mt-0.5">
+                Your onboarding profile has not been imported yet.
+              </p>
+            )}
+          </div>
+
+          {/* Active goals */}
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[10px] font-semibold tracking-[0.14em] text-white/30 uppercase">
+              Active Goals
+            </p>
+            {activeGoals.length > 0 ? (
+              <ul className="flex flex-col gap-1">
+                {activeGoals.map((goal) => (
+                  <li key={goal.id} className="text-sm text-white/70">
+                    {GOAL_LABELS[goal.goalType] ?? goal.goalType}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-white/30">No active goals on file.</p>
+            )}
+          </div>
+
+          {/* Training availability */}
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[10px] font-semibold tracking-[0.14em] text-white/30 uppercase">
+              Training Availability
+            </p>
+            {trainingLabel ? (
+              <p className="text-sm text-white/70">{trainingLabel}</p>
+            ) : (
+              <p className="text-sm text-white/30">Not yet configured.</p>
+            )}
+          </div>
+
+          {/* Nutrition preferences */}
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[10px] font-semibold tracking-[0.14em] text-white/30 uppercase">
+              Nutrition Preferences
+            </p>
+            <p
+              className={`text-sm font-medium ${nutritionComplete ? "text-emerald-400/80" : "text-white/30"}`}
+            >
+              {nutritionComplete ? "Preferences on file" : "Not yet configured."}
             </p>
           </div>
         </div>
