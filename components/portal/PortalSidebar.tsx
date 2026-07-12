@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Activity, Calendar, FileText, LayoutDashboard, Target } from "lucide-react";
 
 interface NavItem {
@@ -60,18 +61,20 @@ export default function PortalSidebar({ clientName }: Props) {
         ))}
       </nav>
 
-      {/* Client identity */}
-      <div className="px-4 py-4 border-t border-white/[0.06]">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-full bg-[#c9a24d]/15 border border-[#c9a24d]/25 flex items-center justify-center shrink-0">
-            <span className="text-[9px] font-bold text-[#c9a24d] leading-none">{initials}</span>
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-xs font-medium text-white/70 truncate">{clientName}</span>
-            <span className="text-[10px] text-white/30">Catalyst Client</span>
-          </div>
+      {/* Client identity — links to account page */}
+      <Link
+        href="/account"
+        className="px-4 py-4 border-t border-white/[0.06] flex items-center gap-2.5 hover:bg-white/[0.03] transition-colors group"
+        title="Account settings"
+      >
+        <div className="w-7 h-7 rounded-full bg-[#c9a24d]/15 border border-[#c9a24d]/25 flex items-center justify-center shrink-0">
+          <span className="text-[9px] font-bold text-[#c9a24d] leading-none">{initials}</span>
         </div>
-      </div>
+        <div className="flex flex-col min-w-0">
+          <span className="text-xs font-medium text-white/70 group-hover:text-white/85 truncate transition-colors">{clientName}</span>
+          <span className="text-[10px] text-white/30">Account →</span>
+        </div>
+      </Link>
     </aside>
   );
 }

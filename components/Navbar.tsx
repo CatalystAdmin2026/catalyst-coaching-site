@@ -31,11 +31,14 @@ export default function Navbar() {
 
   const solid = scrolled || menuOpen;
 
-  // Admin, portal, and mission-entry use their own chrome — suppress public nav
+  // These routes use their own chrome — suppress the marketing nav
   if (
     pathname === "/admin" ||
     pathname.startsWith("/portal") ||
-    pathname.startsWith("/mission-entry")
+    pathname.startsWith("/mission-entry") ||
+    pathname === "/login" ||
+    pathname.startsWith("/auth/") ||
+    pathname === "/account"
   )
     return null;
 

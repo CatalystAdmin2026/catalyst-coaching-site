@@ -11,7 +11,10 @@ export default function Footer() {
   if (
     pathname === "/admin" ||
     pathname.startsWith("/portal") ||
-    pathname.startsWith("/mission-entry")
+    pathname.startsWith("/mission-entry") ||
+    pathname === "/login" ||
+    pathname.startsWith("/auth/") ||
+    pathname === "/account"
   )
     return null;
 

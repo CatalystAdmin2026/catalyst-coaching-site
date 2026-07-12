@@ -8,6 +8,13 @@
       "when": 1783798688610,
       "tag": "0000_fair_excalibur",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1752364800000,
+      "tag": "0001_catalyst_auth",
+      "breakpoints": true
     }
   ]
 }
