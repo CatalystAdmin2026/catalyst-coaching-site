@@ -526,6 +526,10 @@ export const programTemplates = pgTable(
       (): AnyPgColumn => programTemplates.id,
       { onDelete: "set null" },
     ),
+    // Groups template rows that belong to the same lineage. When creating a
+    // new version, copy this UUID from the original row. Null for standalone
+    // templates not yet assigned to a family.
+    templateFamilyId: uuid("template_family_id"),
     metadata: jsonb("metadata").notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -541,6 +545,13 @@ export const programTemplates = pgTable(
     index("idx_program_templates_category").on(table.category),
     index("idx_program_templates_experience").on(table.experienceLevel),
     index("idx_program_templates_parent").on(table.parentTemplateId),
+    index("idx_program_templates_family_id").on(table.templateFamilyId),
+    // Unique (familyId, version) pair when familyId is set. Postgres treats
+    // NULLs as distinct, so unassigned rows do not conflict with each other.
+    uniqueIndex("uq_program_template_family_version").on(
+      table.templateFamilyId,
+      table.version,
+    ),
   ],
 );
 
@@ -568,6 +579,8 @@ export const workoutTemplates = pgTable(
       "recommended_experience_level",
     ).notNull(),
     estimatedDurationMinutes: integer("estimated_duration_minutes"),
+    // Free-text equipment summary retained for backward compat; the
+    // normalized exercise_equipment join table supersedes this.
     recommendedEquipment: jsonb("recommended_equipment").notNull().default([]),
     status: templateStatusEnum("status").notNull().default("draft"),
     version: integer("version").notNull().default(1),
@@ -578,6 +591,13 @@ export const workoutTemplates = pgTable(
       (): AnyPgColumn => workoutTemplates.id,
       { onDelete: "set null" },
     ),
+    // Sprint 5C.1 additions — groups template versions; see program_templates.
+    templateFamilyId: uuid("template_family_id"),
+    objective: text("objective"),
+    coachingMethodology: text("coaching_methodology"),
+    defaultSetStyle: text("default_set_style"),
+    minimumDaysPerWeek: integer("minimum_days_per_week"),
+    maximumDaysPerWeek: integer("maximum_days_per_week"),
     metadata: jsonb("metadata").notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -594,6 +614,23 @@ export const workoutTemplates = pgTable(
       table.recommendedExperienceLevel,
     ),
     index("idx_workout_templates_parent").on(table.parentTemplateId),
+    index("idx_workout_templates_family_id").on(table.templateFamilyId),
+    uniqueIndex("uq_workout_template_family_version").on(
+      table.templateFamilyId,
+      table.version,
+    ),
+    check(
+      "chk_workout_min_days_valid",
+      sql`${table.minimumDaysPerWeek} IS NULL OR (${table.minimumDaysPerWeek} >= 1 AND ${table.minimumDaysPerWeek} <= 7)`,
+    ),
+    check(
+      "chk_workout_max_days_valid",
+      sql`${table.maximumDaysPerWeek} IS NULL OR (${table.maximumDaysPerWeek} >= 1 AND ${table.maximumDaysPerWeek} <= 7)`,
+    ),
+    check(
+      "chk_workout_days_per_week",
+      sql`${table.minimumDaysPerWeek} IS NULL OR ${table.maximumDaysPerWeek} IS NULL OR ${table.minimumDaysPerWeek} <= ${table.maximumDaysPerWeek}`,
+    ),
   ],
 );
 
