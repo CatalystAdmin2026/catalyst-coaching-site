@@ -7,7 +7,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import "server-only";
-import { eq, and, asc, desc, sql } from "drizzle-orm";
+import { eq, and, asc, sql, inArray } from "drizzle-orm";
 import { getDb, type Database } from "./client";
 import { workoutTemplates } from "./schema";
 import {
@@ -305,10 +305,14 @@ export async function getWorkoutHistory(
         sql`${workoutSessions.status} != 'in_progress'`,
       ),
     )
-    .orderBy(desc(workoutSessions.completedAt))
+    // 5B: skipped sessions (null completedAt) sort by scheduledDate rather than
+    // sinking below all completed sessions, which DESC NULLS LAST would cause.
+    .orderBy(
+      sql`COALESCE(${workoutSessions.completedAt}, ${workoutSessions.scheduledDate}::timestamptz, ${workoutSessions.updatedAt}) DESC NULLS LAST`,
+    )
     .limit(limit);
 
-  return sessions.map(({ session, workoutName }) => {
+  const results = sessions.map(({ session, workoutName }) => {
     const snap = session.workoutSnapshot as {
       sections?: { exercises?: unknown[] }[];
       unsectioned?: unknown[];
@@ -335,6 +339,30 @@ export async function getWorkoutHistory(
       exerciseCount,
     };
   });
+
+  // 5A: for sessions where the snapshot held no exercise data (e.g. empty {}
+  // default), fall back to counting distinct workout_template_exercise_id
+  // values from workout_set_logs — one query for all affected sessions.
+  const needsFallback = results.filter((r) => r.exerciseCount === 0).map((r) => r.id);
+  if (needsFallback.length > 0) {
+    const fallbackRows = await db
+      .select({
+        sessionId: workoutSetLogs.workoutSessionId,
+        exerciseCount: sql<number>`count(distinct ${workoutSetLogs.workoutTemplateExerciseId})::int`,
+      })
+      .from(workoutSetLogs)
+      .where(inArray(workoutSetLogs.workoutSessionId, needsFallback))
+      .groupBy(workoutSetLogs.workoutSessionId);
+
+    const fallbackMap = new Map(fallbackRows.map((r) => [r.sessionId, r.exerciseCount]));
+    for (const r of results) {
+      if (r.exerciseCount === 0 && fallbackMap.has(r.id)) {
+        r.exerciseCount = fallbackMap.get(r.id)!;
+      }
+    }
+  }
+
+  return results;
 }
 
 export async function getSessionWithSetsForHistory(
