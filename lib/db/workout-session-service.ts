@@ -1,0 +1,345 @@
+// ─────────────────────────────────────────────────────────────
+// Catalyst OS — Workout Session Service (Sprint 6.0)
+//
+// SERVER-ONLY — never import from a Client Component.
+// Manages workout_sessions and workout_set_logs.
+// Handles session creation, set logging, completion, and history.
+// ─────────────────────────────────────────────────────────────
+
+import "server-only";
+import { eq, and, asc, desc, sql } from "drizzle-orm";
+import { getDb, type Database } from "./client";
+import { workoutTemplates } from "./schema";
+import {
+  workoutSessions,
+  workoutSetLogs,
+  type WorkoutSession,
+  type WorkoutSetLog,
+} from "./schema-program";
+import { workoutTemplateExercises } from "./schema-exercise";
+import { buildWorkoutSnapshot } from "./client-program-service";
+
+// ─────────────────────────────────────────────────────────────
+// SHAPES
+// ─────────────────────────────────────────────────────────────
+
+export interface SessionWithSets {
+  session: WorkoutSession;
+  sets: WorkoutSetLog[];
+}
+
+export interface HistorySession {
+  id: string;
+  workoutTemplateId: string;
+  workoutName: string;
+  scheduledDate: string | null;
+  completedAt: Date | null;
+  status: string;
+  completionPercent: number;
+  programWeekNumber: number | null;
+  clientNotes: string | null;
+  // From snapshot for display
+  sectionCount: number;
+  exerciseCount: number;
+}
+
+// ─────────────────────────────────────────────────────────────
+// SESSION CRUD
+// ─────────────────────────────────────────────────────────────
+
+export async function createWorkoutSession(input: {
+  clientId: string;
+  clientProgramId: string | null;
+  workoutTemplateId: string;
+  programWeekNumber?: number | null;
+  programDayOfWeek?: number | null;
+  scheduledDate?: string | null;
+}): Promise<WorkoutSession> {
+  const db = getDb();
+
+  // Snapshot the workout structure at session-creation time
+  const snapshot = await buildWorkoutSnapshot(input.workoutTemplateId);
+
+  const [row] = await db
+    .insert(workoutSessions)
+    .values({
+      clientId: input.clientId,
+      clientProgramId: input.clientProgramId ?? null,
+      workoutTemplateId: input.workoutTemplateId,
+      programWeekNumber: input.programWeekNumber ?? null,
+      programDayOfWeek: input.programDayOfWeek ?? null,
+      scheduledDate: input.scheduledDate ?? null,
+      startedAt: new Date(),
+      status: "in_progress",
+      completionPercent: 0,
+      workoutSnapshot: snapshot as unknown as Record<string, unknown>,
+    })
+    .returning();
+
+  return row;
+}
+
+export async function getWorkoutSession(
+  sessionId: string,
+  clientId: string,
+): Promise<SessionWithSets | null> {
+  const db = getDb();
+
+  const [session] = await db
+    .select()
+    .from(workoutSessions)
+    .where(
+      and(
+        eq(workoutSessions.id, sessionId),
+        eq(workoutSessions.clientId, clientId),
+      ),
+    )
+    .limit(1);
+
+  if (!session) return null;
+
+  const sets = await db
+    .select()
+    .from(workoutSetLogs)
+    .where(eq(workoutSetLogs.workoutSessionId, sessionId))
+    .orderBy(
+      asc(workoutSetLogs.workoutTemplateExerciseId),
+      asc(workoutSetLogs.setNumber),
+    );
+
+  return { session, sets };
+}
+
+export async function updateWorkoutSession(
+  sessionId: string,
+  clientId: string,
+  data: {
+    status?: "completed" | "skipped";
+    clientNotes?: string | null;
+  },
+): Promise<WorkoutSession> {
+  const db = getDb();
+
+  const baseUpdates: Record<string, unknown> = { updatedAt: new Date() };
+  if (data.status !== undefined) {
+    baseUpdates.status = data.status;
+    baseUpdates.completedAt = data.status === "completed" ? new Date() : null;
+  }
+  if (data.clientNotes !== undefined) baseUpdates.clientNotes = data.clientNotes;
+
+  // Wrap completion in a transaction: compute pct and persist atomically
+  if (data.status === "completed") {
+    const [row] = await db.transaction(async (tx) => {
+      const pct = await computeCompletionPercent(tx as unknown as Database, sessionId);
+      return tx
+        .update(workoutSessions)
+        .set({ ...baseUpdates, completionPercent: pct })
+        .where(and(eq(workoutSessions.id, sessionId), eq(workoutSessions.clientId, clientId)))
+        .returning();
+    });
+    return row;
+  }
+
+  const [row] = await db
+    .update(workoutSessions)
+    .set(baseUpdates)
+    .where(and(eq(workoutSessions.id, sessionId), eq(workoutSessions.clientId, clientId)))
+    .returning();
+  return row;
+}
+
+// ─────────────────────────────────────────────────────────────
+// SET LOGGING
+// ─────────────────────────────────────────────────────────────
+
+export async function logSet(input: {
+  workoutSessionId: string;
+  workoutTemplateExerciseId: string;
+  setNumber: number;
+  actualReps?: number | null;
+  actualWeightKg?: string | null;
+  actualDurationSeconds?: number | null;
+  actualRpe?: string | null;
+  notes?: string | null;
+}): Promise<WorkoutSetLog> {
+  const db = getDb();
+
+  // Wrap insert + completion update in one transaction so the set log
+  // row and the updated completionPercent are always consistent.
+  return db.transaction(async (tx) => {
+    // ON CONFLICT DO UPDATE (idempotent: re-tapping a set updates it)
+    const [row] = await tx
+      .insert(workoutSetLogs)
+      .values({
+        workoutSessionId: input.workoutSessionId,
+        workoutTemplateExerciseId: input.workoutTemplateExerciseId,
+        setNumber: input.setNumber,
+        completedAt: new Date(),
+        actualReps: input.actualReps ?? null,
+        actualWeightKg: input.actualWeightKg ?? null,
+        actualDurationSeconds: input.actualDurationSeconds ?? null,
+        actualRpe: input.actualRpe ?? null,
+        notes: input.notes ?? null,
+      })
+      .onConflictDoUpdate({
+        target: [
+          workoutSetLogs.workoutSessionId,
+          workoutSetLogs.workoutTemplateExerciseId,
+          workoutSetLogs.setNumber,
+        ],
+        set: {
+          completedAt: new Date(),
+          actualReps: input.actualReps ?? null,
+          actualWeightKg: input.actualWeightKg ?? null,
+          actualDurationSeconds: input.actualDurationSeconds ?? null,
+          actualRpe: input.actualRpe ?? null,
+          notes: input.notes ?? null,
+        },
+      })
+      .returning();
+
+    const pct = await computeCompletionPercent(tx as unknown as Database, input.workoutSessionId);
+    await tx
+      .update(workoutSessions)
+      .set({ completionPercent: pct, updatedAt: new Date() })
+      .where(eq(workoutSessions.id, input.workoutSessionId));
+
+    return row;
+  });
+}
+
+export async function deleteSet(
+  workoutSessionId: string,
+  workoutTemplateExerciseId: string,
+  setNumber: number,
+): Promise<void> {
+  const db = getDb();
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(workoutSetLogs)
+      .where(
+        and(
+          eq(workoutSetLogs.workoutSessionId, workoutSessionId),
+          eq(workoutSetLogs.workoutTemplateExerciseId, workoutTemplateExerciseId),
+          eq(workoutSetLogs.setNumber, setNumber),
+        ),
+      );
+
+    const pct = await computeCompletionPercent(tx as unknown as Database, workoutSessionId);
+    await tx
+      .update(workoutSessions)
+      .set({ completionPercent: pct, updatedAt: new Date() })
+      .where(eq(workoutSessions.id, workoutSessionId));
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// COMPLETION CALCULATION
+//
+// Sets prescribed = sum of workout_template_exercises.sets for
+// this workout template. Sets completed = count of set log rows
+// for this session. Percent = min(100, completed / prescribed * 100).
+//
+// Accepts db or a transaction tx (cast to Database) so it can
+// run inside a db.transaction() without escaping the transaction.
+// ─────────────────────────────────────────────────────────────
+
+async function computeCompletionPercent(
+  db: Database,
+  sessionId: string,
+): Promise<number> {
+  const [session] = await db
+    .select({ workoutTemplateId: workoutSessions.workoutTemplateId })
+    .from(workoutSessions)
+    .where(eq(workoutSessions.id, sessionId))
+    .limit(1);
+
+  if (!session) return 0;
+
+  // Total sets prescribed
+  const prescribed = await db
+    .select({ sets: workoutTemplateExercises.sets })
+    .from(workoutTemplateExercises)
+    .where(
+      eq(
+        workoutTemplateExercises.workoutTemplateId,
+        session.workoutTemplateId,
+      ),
+    );
+
+  const totalSets = prescribed.reduce((s, p) => s + (p.sets ?? 1), 0);
+  if (totalSets === 0) return 0;
+
+  // Count completed set logs
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(workoutSetLogs)
+    .where(eq(workoutSetLogs.workoutSessionId, sessionId));
+
+  return Math.min(100, Math.round((count / totalSets) * 100));
+}
+
+// ─────────────────────────────────────────────────────────────
+// WORKOUT HISTORY
+// ─────────────────────────────────────────────────────────────
+
+export async function getWorkoutHistory(
+  clientId: string,
+  limit = 20,
+): Promise<HistorySession[]> {
+  const db = getDb();
+
+  const sessions = await db
+    .select({
+      session: workoutSessions,
+      workoutName: workoutTemplates.name,
+    })
+    .from(workoutSessions)
+    .innerJoin(
+      workoutTemplates,
+      eq(workoutSessions.workoutTemplateId, workoutTemplates.id),
+    )
+    .where(
+      and(
+        eq(workoutSessions.clientId, clientId),
+        sql`${workoutSessions.status} != 'in_progress'`,
+      ),
+    )
+    .orderBy(desc(workoutSessions.completedAt))
+    .limit(limit);
+
+  return sessions.map(({ session, workoutName }) => {
+    const snap = session.workoutSnapshot as {
+      sections?: { exercises?: unknown[] }[];
+      unsectioned?: unknown[];
+    } | null;
+
+    const sectionCount = snap?.sections?.length ?? 0;
+    const exerciseCount =
+      (snap?.sections?.reduce(
+        (s, sec) => s + (sec.exercises?.length ?? 0),
+        0,
+      ) ?? 0) + (snap?.unsectioned?.length ?? 0);
+
+    return {
+      id: session.id,
+      workoutTemplateId: session.workoutTemplateId,
+      workoutName,
+      scheduledDate: session.scheduledDate,
+      completedAt: session.completedAt,
+      status: session.status,
+      completionPercent: session.completionPercent,
+      programWeekNumber: session.programWeekNumber,
+      clientNotes: session.clientNotes,
+      sectionCount,
+      exerciseCount,
+    };
+  });
+}
+
+export async function getSessionWithSetsForHistory(
+  sessionId: string,
+  clientId: string,
+): Promise<SessionWithSets | null> {
+  return getWorkoutSession(sessionId, clientId);
+}

@@ -36,6 +36,13 @@
       "when": 1783875121663,
       "tag": "0004_loud_secret_warriors",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1783897827788,
+      "tag": "0005_freezing_namorita",
+      "breakpoints": true
     }
   ]
 }

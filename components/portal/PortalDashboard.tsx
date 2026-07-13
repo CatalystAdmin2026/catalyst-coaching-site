@@ -25,6 +25,8 @@ import LiveMissionBriefing from "./LiveMissionBriefing";
 import MissionTile from "./MissionTile";
 import MissionProgress from "./MissionProgress";
 import MissionDebrief from "./MissionDebrief";
+import TodayWorkout from "./TodayWorkout";
+import WorkoutHistory from "./WorkoutHistory";
 import { getScenarioData } from "@/lib/portal/mockData";
 import type { PortalScenario } from "@/lib/portal/types";
 
@@ -135,14 +137,34 @@ export default function PortalDashboard({ clientName }: Props) {
             ))}
           </div>
 
-          {/* 3. Identity metrics + progress ring */}
+          {/* 3. Today's workout */}
+          <div style={tileStyle(liveData.missions.length)}>
+            <div className="mb-1">
+              <p className="text-[9px] text-gray-600 uppercase tracking-[0.5em] font-semibold mb-3">
+                Today&apos;s Training
+              </p>
+              <TodayWorkout />
+            </div>
+          </div>
+
+          {/* 4. Identity metrics + progress ring */}
           {/* TODO Sprint 5B.5: Replace with real streak and promise count */}
           <MissionProgress
             missions={liveData.missions}
             stats={liveData.stats}
           />
 
-          {/* 4. Coach debrief */}
+          {/* 5. Workout history */}
+          <div style={tileStyle(liveData.missions.length + 1)}>
+            <div className="mb-1">
+              <p className="text-[9px] text-gray-600 uppercase tracking-[0.5em] font-semibold mb-3">
+                Training History
+              </p>
+              <WorkoutHistory />
+            </div>
+          </div>
+
+          {/* 6. Coach debrief */}
           {/* TODO Sprint 5B.5: Replace with AI-generated debrief */}
           {!allComplete && (
             <MissionDebrief

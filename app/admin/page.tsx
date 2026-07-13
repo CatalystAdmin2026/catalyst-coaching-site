@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import AdminGate from "@/components/AdminGate";
 import { fetchSheetData, type SheetRow } from "@/lib/sheets";
 import { fetchCalendlyEvents, type CalendlyEvent } from "@/lib/calendly";
@@ -1758,7 +1759,10 @@ type Tab =
   | "tasks"
   | "live-sheets"
   | "stripe-events"
-  | "calendly";
+  | "calendly"
+  | "blueprints"
+  | "programs"
+  | "training";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview",        label: "Overview" },
@@ -1771,6 +1775,9 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "live-sheets",     label: "Live Sheets" },
   { id: "stripe-events",   label: "Stripe Events" },
   { id: "calendly",        label: "Calendly" },
+  { id: "blueprints",      label: "Blueprints" },
+  { id: "programs",        label: "Programs" },
+  { id: "training",        label: "Training" },
 ];
 
 export default function AdminPage() {
@@ -1923,6 +1930,58 @@ export default function AdminPage() {
           {tab === "live-sheets"     && <LiveSheetsTab />}
           {tab === "stripe-events"   && <StripeEventsTab diagnostic={reconciliationDiag} />}
           {tab === "calendly"        && <CalendlyTab />}
+          {tab === "programs"        && (
+            <div className="py-4">
+              <div className="border border-white/[0.08] bg-[#0d0e0f] px-6 py-6 flex items-center justify-between">
+                <div>
+                  <p className="text-white font-semibold text-sm mb-1">Program Builder</p>
+                  <p className="text-gray-600 text-xs">
+                    Build multi-week training programs by assigning workout blueprints to calendar days. Publish programs and assign them to clients with a start date.
+                  </p>
+                </div>
+                <Link
+                  href="/admin/programs"
+                  className="shrink-0 ml-6 bg-[#C9A24D] text-black font-bold text-[10px] tracking-[0.3em] uppercase px-5 py-2.5 hover:bg-[#D4B56A] transition-colors"
+                >
+                  Open Builder →
+                </Link>
+              </div>
+            </div>
+          )}
+          {tab === "training"        && (
+            <div className="py-4">
+              <div className="border border-white/[0.08] bg-[#0d0e0f] px-6 py-6">
+                <p className="text-white font-semibold text-sm mb-1">Client Training Overview</p>
+                <p className="text-gray-600 text-xs mb-4">
+                  Manage client program assignments, track compliance, and monitor training progress. Assign programs via the Program Builder.
+                </p>
+                <Link
+                  href="/admin/programs"
+                  className="inline-block text-[10px] tracking-[0.25em] uppercase font-semibold text-gray-500 border border-white/[0.1] px-4 py-2 hover:text-white hover:border-white/20 transition-colors"
+                >
+                  Go to Program Builder →
+                </Link>
+              </div>
+            </div>
+          )}
+          {tab === "blueprints"      && (
+            <div className="py-4">
+              <div className="border border-white/[0.08] bg-[#0d0e0f] px-6 py-6 flex items-center justify-between">
+                <div>
+                  <p className="text-white font-semibold text-sm mb-1">Workout Blueprint Builder</p>
+                  <p className="text-gray-600 text-xs">
+                    Create and manage workout templates — organize sections, add exercises, configure sets/reps/tempo, assign advanced techniques, and validate structure before publishing.
+                  </p>
+                </div>
+                <Link
+                  href="/admin/blueprints"
+                  className="shrink-0 ml-6 bg-[#C9A24D] text-black font-bold text-[10px] tracking-[0.3em] uppercase px-5 py-2.5 hover:bg-[#D4B56A] transition-colors"
+                >
+                  Open Builder →
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── FUTURE INTEGRATIONS ────────────────────────────── */}

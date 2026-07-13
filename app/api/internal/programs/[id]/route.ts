@@ -1,0 +1,91 @@
+import { type NextRequest, NextResponse } from "next/server";
+import {
+  getProgramContent,
+  updateProgramTemplate,
+  deleteProgramTemplate,
+  publishProgram,
+} from "@/lib/db/program-builder-service";
+import { requireCoachOrAdmin } from "@/lib/auth/guards";
+
+export const dynamic = "force-dynamic";
+
+type Ctx = { params: Promise<{ id: string }> };
+
+export async function GET(_req: NextRequest, { params }: Ctx) {
+  const guard = await requireCoachOrAdmin();
+  if (!guard.ok) return guard.response;
+  const { id } = await params;
+  try {
+    const content = await getProgramContent(id);
+    if (!content) {
+      return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+    }
+    return NextResponse.json({ ok: true, ...content });
+  } catch (err) {
+    return NextResponse.json(
+      { ok: false, error: err instanceof Error ? err.message : "Failed" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function PUT(req: NextRequest, { params }: Ctx) {
+  const guard = await requireCoachOrAdmin();
+  if (!guard.ok) return guard.response;
+  const { id } = await params;
+  try {
+    const body = await req.json() as {
+      publish?: boolean;
+      name?: string;
+      description?: string | null;
+      category?: string;
+      experienceLevel?: string;
+      recommendedDaysPerWeek?: number | null;
+      defaultDurationWeeks?: number | null;
+      status?: string;
+    };
+
+    if (body.publish) {
+      const result = await publishProgram(id);
+      if (!result.ok) {
+        return NextResponse.json(
+          { ok: false, errors: result.errors },
+          { status: 422 },
+        );
+      }
+      return NextResponse.json({ ok: true, template: result.template });
+    }
+
+    const template = await updateProgramTemplate(id, {
+      name: body.name,
+      description: body.description,
+      category: body.category as Parameters<typeof updateProgramTemplate>[1]["category"],
+      experienceLevel: body.experienceLevel as Parameters<typeof updateProgramTemplate>[1]["experienceLevel"],
+      recommendedDaysPerWeek: body.recommendedDaysPerWeek,
+      defaultDurationWeeks: body.defaultDurationWeeks,
+      status: body.status,
+    });
+
+    return NextResponse.json({ ok: true, template });
+  } catch (err) {
+    return NextResponse.json(
+      { ok: false, error: err instanceof Error ? err.message : "Failed" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(_req: NextRequest, { params }: Ctx) {
+  const guard = await requireCoachOrAdmin();
+  if (!guard.ok) return guard.response;
+  const { id } = await params;
+  try {
+    await deleteProgramTemplate(id);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return NextResponse.json(
+      { ok: false, error: err instanceof Error ? err.message : "Failed" },
+      { status: 500 },
+    );
+  }
+}
