@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local-only development fixture scripts (contain hardcoded UUIDs / test credentials)
+scripts/create-sprint61-fixtures.ts
+scripts/acceptance-test-sprint61.ts

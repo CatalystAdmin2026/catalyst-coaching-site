@@ -29,12 +29,11 @@ export default async function PortalPage() {
   // Name resolution priority:
   //   1. preferredName (e.g. "Jermaine")
   //   2. fullName (e.g. "Jermaine Jones")
-  //   3. email name portion (e.g. "jermaine" from jermaine@example.com)
-  //   4. Fallback "Client"
+  //   3. "Client" — never use the email local-part; Gmail aliases
+  //      (user+tag@gmail.com) produce long, unrenderable strings
   const clientName =
     profile?.preferredName ||
     profile?.fullName ||
-    authUser.email?.split("@")[0] ||
     "Client";
 
   return <PortalDashboard clientName={clientName} />;

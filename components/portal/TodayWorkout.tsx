@@ -61,12 +61,12 @@ function EmptyState({ kind }: { kind: string }) {
   return (
     <div className="border border-white/[0.06] bg-[#0d0e0f] p-6 text-center">
       <div className="w-8 h-8 border border-white/[0.1] rounded-full flex items-center justify-center mx-auto mb-3">
-        <span className="text-gray-600 text-sm">
+        <span className="text-gray-400 text-sm">
           {kind === "rest_day" ? "○" : kind === "program_complete" ? "✓" : "·"}
         </span>
       </div>
       <p className="text-white text-sm font-semibold mb-1">{msg.title}</p>
-      <p className="text-gray-600 text-xs leading-relaxed">{msg.body}</p>
+      <p className="text-gray-400 text-xs leading-relaxed">{msg.body}</p>
     </div>
   );
 }
@@ -125,7 +125,7 @@ function WorkoutCard({
       <div className="px-5 pt-5 pb-4 border-b border-white/[0.04]">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[9px] text-gray-600 uppercase tracking-[0.5em] mb-1">
+            <p className="text-[9px] text-gray-400 uppercase tracking-[0.5em] mb-1">
               {data.programName} · Week {data.weekNumber} of {data.totalWeeks}
             </p>
             <h3 className="text-white text-lg font-bold tracking-wide">{data.workoutName}</h3>
@@ -133,12 +133,12 @@ function WorkoutCard({
           {data.estimatedDurationMinutes && (
             <div className="shrink-0 text-right">
               <p className="text-[#C9A24D] text-lg font-bold">{data.estimatedDurationMinutes}</p>
-              <p className="text-gray-600 text-[9px] uppercase tracking-[0.3em]">min</p>
+              <p className="text-gray-400 text-[9px] uppercase tracking-[0.3em]">min</p>
             </div>
           )}
         </div>
 
-        <div className="flex items-center gap-4 mt-3 text-gray-600 text-[11px]">
+        <div className="flex items-center gap-4 mt-3 text-gray-400 text-[11px]">
           <span>{totalExercises} exercise{totalExercises !== 1 ? "s" : ""}</span>
           <span>·</span>
           <span>{totalSets} total sets</span>
@@ -156,16 +156,16 @@ function WorkoutCard({
         <div className="space-y-1.5">
           {data.snapshot.sections.slice(0, 4).map((sec) => (
             <div key={sec.id} className="flex items-center gap-3">
-              <span className="text-gray-700 text-[9px] uppercase tracking-[0.3em] w-20 shrink-0">
+              <span className="text-gray-500 text-[9px] uppercase tracking-[0.3em] w-20 shrink-0">
                 {sec.name}
               </span>
-              <span className="text-gray-600 text-[10px]">
+              <span className="text-gray-400 text-[10px]">
                 {sec.exercises.map((e) => e.exerciseName).join(", ")}
               </span>
             </div>
           ))}
           {data.snapshot.sections.length > 4 && (
-            <p className="text-gray-700 text-[10px]">
+            <p className="text-gray-500 text-[10px]">
               +{data.snapshot.sections.length - 4} more sections
             </p>
           )}
@@ -228,10 +228,34 @@ export default function TodayWorkout() {
 
   if (loading) {
     return (
-      <div className="border border-white/[0.06] bg-[#0d0e0f] p-6">
-        <div className="h-4 bg-white/[0.04] animate-pulse mb-2 w-1/3" />
-        <div className="h-6 bg-white/[0.04] animate-pulse mb-4 w-2/3" />
-        <div className="h-12 bg-white/[0.04] animate-pulse" />
+      <div className="border border-white/[0.06] bg-[#0d0e0f]">
+        {/* Header skeleton */}
+        <div className="px-5 pt-5 pb-4 border-b border-white/[0.04]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="h-2 bg-white/[0.05] animate-pulse w-2/5 mb-3" />
+              <div className="h-5 bg-white/[0.07] animate-pulse w-3/4 mb-3" />
+              <div className="flex gap-3">
+                <div className="h-2 bg-white/[0.04] animate-pulse w-20" />
+                <div className="h-2 bg-white/[0.04] animate-pulse w-16" />
+              </div>
+            </div>
+            <div className="h-9 w-10 bg-white/[0.04] animate-pulse shrink-0" />
+          </div>
+        </div>
+        {/* Section preview skeleton */}
+        <div className="px-5 py-3 border-b border-white/[0.04] space-y-2.5">
+          {([55, 75, 45] as const).map((w, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <div className="h-2 bg-white/[0.04] animate-pulse w-16 shrink-0" />
+              <div className="h-2 bg-white/[0.04] animate-pulse flex-1" style={{ maxWidth: `${w}%` }} />
+            </div>
+          ))}
+        </div>
+        {/* CTA skeleton */}
+        <div className="px-5 py-4">
+          <div className="h-12 bg-white/[0.04] animate-pulse" />
+        </div>
       </div>
     );
   }
@@ -267,11 +291,11 @@ export default function TodayWorkout() {
           <span className="text-emerald-400 text-base">✓</span>
         </div>
         <h3 className="text-white text-lg font-bold mb-1">Workout Complete</h3>
-        <p className="text-gray-600 text-sm mb-1">{todayData.workoutName}</p>
+        <p className="text-gray-400 text-sm mb-1">{todayData.workoutName}</p>
         {completionPct !== null && (
           <p className="text-[#C9A24D] font-bold text-2xl mb-4">{completionPct}%</p>
         )}
-        <p className="text-gray-700 text-xs">
+        <p className="text-gray-500 text-xs">
           Your session has been recorded. Rest up and recover strong.
         </p>
       </div>

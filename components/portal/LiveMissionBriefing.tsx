@@ -37,15 +37,18 @@ export default function LiveMissionBriefing({ clientName, todayKind }: Props) {
       {/* Gold overline */}
       <div className="w-8 h-[2px] bg-[#c9a24d] mb-4" aria-hidden />
 
-      {/* Headline */}
+      {/* Headline — fixed text, no overflow risk */}
       <h1 className="font-headline text-5xl md:text-6xl lg:text-[4.5rem] uppercase tracking-[0.04em] text-white leading-none">
         Today&apos;s
         <br />
         Mission
       </h1>
 
-      {/* Greeting */}
-      <p className="font-headline text-xl md:text-2xl uppercase tracking-[0.08em] text-white/45 leading-tight mt-2">
+      {/* Greeting — user-supplied name; clamp + break-words prevents overflow */}
+      <p
+        className="font-headline uppercase tracking-[0.08em] text-white/45 leading-tight mt-2 break-words min-w-0"
+        style={{ fontSize: "clamp(1rem, 4vw, 1.5rem)" }}
+      >
         {greeting}, {firstName}.
       </p>
 

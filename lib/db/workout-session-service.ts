@@ -9,8 +9,9 @@
 import "server-only";
 import { eq, and, asc, sql, inArray } from "drizzle-orm";
 import { getDb, type Database } from "./client";
-import { workoutTemplates } from "./schema";
+import { programTemplates, workoutTemplates } from "./schema";
 import {
+  clientPrograms,
   workoutSessions,
   workoutSetLogs,
   type WorkoutSession,
@@ -22,6 +23,32 @@ import { buildWorkoutSnapshot } from "./client-program-service";
 // ─────────────────────────────────────────────────────────────
 // SHAPES
 // ─────────────────────────────────────────────────────────────
+
+export interface HistoricalSetLog {
+  workoutTemplateExerciseId: string;
+  setNumber: number;
+  completedAt: Date;
+  actualReps: number | null;
+  actualWeightLbs: number | null; // converted from kg at read time
+  actualDurationSeconds: number | null;
+  actualRpe: number | null;
+  notes: string | null;
+}
+
+export interface HistoricalSessionDetail {
+  id: string;
+  workoutName: string;
+  status: string;
+  scheduledDate: string | null;
+  completedAt: Date | null;
+  startedAt: Date | null;
+  completionPercent: number;
+  programWeekNumber: number | null;
+  programName: string | null;
+  clientNotes: string | null;
+  snapshot: Record<string, unknown> | null;
+  setLogs: HistoricalSetLog[];
+}
 
 export interface SessionWithSets {
   session: WorkoutSession;
@@ -370,4 +397,85 @@ export async function getSessionWithSetsForHistory(
   clientId: string,
 ): Promise<SessionWithSets | null> {
   return getWorkoutSession(sessionId, clientId);
+}
+
+// ─────────────────────────────────────────────────────────────
+// HISTORICAL SESSION DETAIL
+//
+// Fetches a single completed/skipped session with its full set logs.
+// Validates ownership: returns null if sessionId belongs to a
+// different client (non-disclosing — caller should respond with 404).
+//
+// Weight is converted kg→lbs here so the UI layer never touches kg.
+// Snapshot is returned as-is (JSONB); the page parses the structure.
+// Program name is resolved via clientPrograms → programTemplates join
+// (left join because clientProgramId may be null if program was deleted).
+// ─────────────────────────────────────────────────────────────
+
+function kgToLbsService(kg: string | null | undefined): number | null {
+  if (kg == null) return null;
+  const n = parseFloat(kg);
+  return isNaN(n) ? null : Math.round((n / 0.453592) * 10) / 10;
+}
+
+export async function getHistoricalSessionDetail(
+  sessionId: string,
+  clientId: string,
+): Promise<HistoricalSessionDetail | null> {
+  const db = getDb();
+
+  const [row] = await db
+    .select({
+      session: workoutSessions,
+      workoutName: workoutTemplates.name,
+      programName: programTemplates.name,
+    })
+    .from(workoutSessions)
+    .innerJoin(workoutTemplates, eq(workoutSessions.workoutTemplateId, workoutTemplates.id))
+    .leftJoin(clientPrograms, eq(workoutSessions.clientProgramId, clientPrograms.id))
+    .leftJoin(programTemplates, eq(clientPrograms.programTemplateId, programTemplates.id))
+    .where(
+      and(
+        eq(workoutSessions.id, sessionId),
+        eq(workoutSessions.clientId, clientId),
+      ),
+    )
+    .limit(1);
+
+  if (!row) return null;
+
+  const setRows = await db
+    .select()
+    .from(workoutSetLogs)
+    .where(eq(workoutSetLogs.workoutSessionId, sessionId))
+    .orderBy(
+      asc(workoutSetLogs.workoutTemplateExerciseId),
+      asc(workoutSetLogs.setNumber),
+    );
+
+  const setLogs: HistoricalSetLog[] = setRows.map((s) => ({
+    workoutTemplateExerciseId: s.workoutTemplateExerciseId,
+    setNumber: s.setNumber,
+    completedAt: s.completedAt,
+    actualReps: s.actualReps ?? null,
+    actualWeightLbs: kgToLbsService(s.actualWeightKg),
+    actualDurationSeconds: s.actualDurationSeconds ?? null,
+    actualRpe: s.actualRpe !== null ? parseFloat(s.actualRpe) : null,
+    notes: s.notes ?? null,
+  }));
+
+  return {
+    id: row.session.id,
+    workoutName: row.workoutName,
+    status: row.session.status,
+    scheduledDate: row.session.scheduledDate,
+    completedAt: row.session.completedAt,
+    startedAt: row.session.startedAt,
+    completionPercent: row.session.completionPercent,
+    programWeekNumber: row.session.programWeekNumber,
+    programName: row.programName ?? null,
+    clientNotes: row.session.clientNotes,
+    snapshot: row.session.workoutSnapshot as Record<string, unknown> | null,
+    setLogs,
+  };
 }

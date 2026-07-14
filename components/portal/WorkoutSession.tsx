@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { lbsToKg } from "@/lib/portal/units";
 
 // ─────────────────────────────────────────────────────────────
-// TYPES (match WorkoutSnapshot from client-program-service)
+// TYPES
 // ─────────────────────────────────────────────────────────────
 
 interface ExerciseItem {
-  id: string; // workout_template_exercise id
+  id: string;
   exerciseName: string;
   orderIndex: number;
   groupId: string | null;
@@ -51,25 +51,26 @@ export interface Props {
   onCancel: () => void;
 }
 
-// ─────────────────────────────────────────────────────────────
-// PER-SET STATE
-// ─────────────────────────────────────────────────────────────
-
 type SetStatus = "idle" | "pending" | "done" | "editing" | "error";
 
 interface SetData {
   status: SetStatus;
-  // Input values (controlled strings for number inputs)
   weightLbs: string;
   reps: string;
-  duration: string; // seconds
+  duration: string;
   rpe: string;
-  // Logged values shown in "done" state
   loggedWeightLbs: number | null;
   loggedReps: number | null;
   loggedDuration: number | null;
   loggedRpe: number | null;
   errorMsg: string;
+}
+
+interface RestTimer {
+  exerciseName: string;
+  totalSeconds: number;
+  remaining: number;
+  done: boolean;
 }
 
 const DEFAULT_SET: SetData = {
@@ -85,13 +86,13 @@ const DEFAULT_SET: SetData = {
   errorMsg: "",
 };
 
-function sKey(exerciseId: string, setNum: number) {
-  return `${exerciseId}::${setNum}`;
-}
-
 // ─────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────
+
+function sKey(exerciseId: string, setNum: number) {
+  return `${exerciseId}::${setNum}`;
+}
 
 function fmtLabel(s: string) {
   return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -111,12 +112,15 @@ function validateSetData(data: SetData): string | null {
   const reps = data.reps ? parseInt(data.reps, 10) : null;
   const duration = data.duration ? parseInt(data.duration, 10) : null;
   const rpe = data.rpe ? parseFloat(data.rpe) : null;
-
   if (weight !== null && weight < 0) return "Weight cannot be negative";
   if (reps !== null && reps < 0) return "Reps cannot be negative";
   if (duration !== null && duration < 0) return "Duration cannot be negative";
   if (rpe !== null && (rpe < 0 || rpe > 10)) return "RPE must be 0–10";
   return null;
+}
+
+function fmtTime(d: Date): string {
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
 const TECHNIQUE_COLORS: Record<string, string> = {
@@ -128,6 +132,90 @@ const TECHNIQUE_COLORS: Record<string, string> = {
   stretch_mediated_finisher: "text-sky-400",
   lengthened_partials: "text-amber-400",
 };
+
+// ─────────────────────────────────────────────────────────────
+// REST TIMER PANEL — fixed bottom, persists while scrolling
+// ─────────────────────────────────────────────────────────────
+
+function RestTimerPanel({
+  timer,
+  onDismiss,
+  rm,
+}: {
+  timer: RestTimer;
+  onDismiss: () => void;
+  rm: boolean;
+}) {
+  const pct =
+    timer.totalSeconds > 0
+      ? Math.max(0, Math.round((timer.remaining / timer.totalSeconds) * 100))
+      : 0;
+
+  return (
+    <div
+      className="fixed bottom-0 inset-x-0 z-50 bg-[#0c0d0e]/[0.97] border-t border-white/[0.08] px-5 pt-3 pb-[env(safe-area-inset-bottom,12px)]"
+      style={rm ? {} : { animation: "ws-fade-up 200ms ease-out both" }}
+      role="timer"
+      aria-live="polite"
+      aria-label={
+        timer.done ? "Rest complete" : `Rest: ${timer.remaining} seconds remaining`
+      }
+    >
+      {timer.done ? (
+        <div className="flex items-center justify-between max-w-2xl mx-auto py-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" aria-hidden />
+            <span className="text-emerald-400 text-[10px] font-bold uppercase tracking-[0.18em]">
+              Rest Complete
+            </span>
+          </div>
+          <button
+            onClick={onDismiss}
+            className="text-gray-500 text-[10px] hover:text-gray-300 transition-colors uppercase tracking-widest"
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : (
+        <div className="max-w-2xl mx-auto pb-2">
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="min-w-0 flex items-baseline gap-2">
+              <span className="text-[9px] text-gray-400 uppercase tracking-[0.2em] shrink-0">
+                Rest
+              </span>
+              <span className="text-[9px] text-gray-500 truncate max-w-[140px] sm:max-w-none">
+                {timer.exerciseName}
+              </span>
+            </div>
+            <div className="flex items-center gap-4 shrink-0">
+              <span
+                className="text-white font-bold text-xl leading-none tabular-nums"
+                aria-atomic="true"
+              >
+                {timer.remaining}s
+              </span>
+              <button
+                onClick={onDismiss}
+                className="text-gray-500 text-[10px] hover:text-gray-300 transition-colors"
+              >
+                Skip
+              </button>
+            </div>
+          </div>
+          <div className="h-px bg-white/[0.08] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[#C9A24D] rounded-full origin-left"
+              style={{
+                width: `${pct}%`,
+                transition: rm ? "none" : "width 950ms linear",
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────
 // NUM INPUT
@@ -165,8 +253,47 @@ function NumInput({
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
       aria-label={ariaLabel}
-      className={`${width} bg-[#080909] border border-white/[0.08] text-white text-[11px] px-2 py-1.5 text-center focus:outline-none focus:border-[#C9A24D]/40 disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+      className={`${width} bg-[#080909] border border-white/[0.15] text-white text-[11px] px-2 py-1.5 text-center focus:outline-none focus:border-[#C9A24D]/50 placeholder:text-gray-500 disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
     />
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// SET DONE ROW — fades in on mount to mark completion
+// ─────────────────────────────────────────────────────────────
+
+function SetDoneRow({
+  setNum,
+  parts,
+  onCorrect,
+  rm,
+}: {
+  setNum: number;
+  parts: string[];
+  onCorrect: () => void;
+  rm: boolean;
+}) {
+  return (
+    <div
+      className="flex items-center gap-3 py-2 border-b border-white/[0.03] last:border-b-0"
+      style={rm ? {} : { animation: "ws-fade-up 280ms ease-out both" }}
+    >
+      <span className="text-[10px] text-gray-500 w-12 shrink-0 font-mono">Set {setNum}</span>
+      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400/80 shrink-0" aria-hidden />
+      <span className="text-emerald-400 text-[10px] font-semibold uppercase tracking-[0.1em]">
+        Promise Kept
+      </span>
+      {parts.length > 0 && (
+        <span className="text-gray-400 text-[10px] hidden sm:block">{parts.join(" · ")}</span>
+      )}
+      <button
+        onClick={onCorrect}
+        aria-label={`Correct set ${setNum}`}
+        className="ml-auto text-gray-500 text-[10px] hover:text-gray-300 transition-colors shrink-0"
+      >
+        Correct
+      </button>
+    </div>
   );
 }
 
@@ -181,6 +308,7 @@ function SetRow({
   onUpdate,
   onLog,
   onCorrect,
+  rm,
 }: {
   setNum: number;
   isTimeBased: boolean;
@@ -188,6 +316,7 @@ function SetRow({
   onUpdate: (patch: Partial<SetData>) => void;
   onLog: () => void;
   onCorrect: () => void;
+  rm: boolean;
 }) {
   const isPending = data.status === "pending";
 
@@ -197,31 +326,13 @@ function SetRow({
     if (data.loggedReps !== null) parts.push(`${data.loggedReps} reps`);
     if (data.loggedDuration !== null) parts.push(`${data.loggedDuration}s`);
     if (data.loggedRpe !== null) parts.push(`RPE ${data.loggedRpe}`);
-
-    return (
-      <div className="flex items-center gap-3 py-2 border-b border-white/[0.03] last:border-b-0">
-        <span className="text-[10px] text-gray-700 w-12 shrink-0 font-mono">Set {setNum}</span>
-        <div className="w-2 h-2 rounded-full bg-emerald-500/50 shrink-0" />
-        <span className="text-emerald-400 text-[10px] font-semibold uppercase tracking-[0.1em]">
-          Promise Kept
-        </span>
-        {parts.length > 0 && (
-          <span className="text-gray-600 text-[10px] hidden sm:block">{parts.join(" · ")}</span>
-        )}
-        <button
-          onClick={onCorrect}
-          className="ml-auto text-gray-700 text-[10px] hover:text-gray-400 transition-colors shrink-0"
-        >
-          Correct
-        </button>
-      </div>
-    );
+    return <SetDoneRow setNum={setNum} parts={parts} onCorrect={onCorrect} rm={rm} />;
   }
 
   return (
     <div className="border-b border-white/[0.03] last:border-b-0 py-2">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-[10px] text-gray-700 w-12 shrink-0 font-mono">
+        <span className="text-[10px] text-gray-500 w-12 shrink-0 font-mono">
           {data.status === "editing" ? `✎ ${setNum}` : `Set ${setNum}`}
         </span>
 
@@ -238,7 +349,7 @@ function SetRow({
                 disabled={isPending}
                 ariaLabel="Weight in pounds"
               />
-              <span className="text-gray-600 text-[10px] shrink-0">lb</span>
+              <span className="text-gray-400 text-[10px] shrink-0">lb</span>
             </div>
 
             <div className="flex items-center gap-1">
@@ -252,7 +363,7 @@ function SetRow({
                 disabled={isPending}
                 ariaLabel="Reps completed"
               />
-              <span className="text-gray-600 text-[10px] shrink-0">reps</span>
+              <span className="text-gray-400 text-[10px] shrink-0">reps</span>
             </div>
           </>
         )}
@@ -269,7 +380,7 @@ function SetRow({
               disabled={isPending}
               ariaLabel="Duration in seconds"
             />
-            <span className="text-gray-600 text-[10px] shrink-0">sec</span>
+            <span className="text-gray-400 text-[10px] shrink-0">sec</span>
           </div>
         )}
 
@@ -290,6 +401,7 @@ function SetRow({
         <button
           onClick={onLog}
           disabled={isPending}
+          aria-label={`Log set ${setNum}`}
           className="bg-[#C9A24D]/10 border border-[#C9A24D]/20 text-[#C9A24D] text-[10px] font-bold tracking-[0.15em] uppercase px-3 py-1.5 hover:bg-[#C9A24D]/20 transition-colors disabled:opacity-50 shrink-0"
         >
           {isPending ? "…" : "Log"}
@@ -297,7 +409,9 @@ function SetRow({
       </div>
 
       {data.errorMsg && (
-        <p className="text-red-400 text-[10px] mt-1 pl-14">{data.errorMsg}</p>
+        <p className="text-red-400 text-[10px] mt-1 pl-14" role="alert">
+          {data.errorMsg}
+        </p>
       )}
     </div>
   );
@@ -313,12 +427,14 @@ function ExerciseRow({
   onUpdate,
   onLog,
   onCorrect,
+  rm,
 }: {
   exercise: ExerciseItem;
   setStates: Map<string, SetData>;
   onUpdate: (exerciseId: string, setNum: number, patch: Partial<SetData>) => void;
   onLog: (exerciseId: string, setNum: number) => void;
   onCorrect: (exerciseId: string, setNum: number) => void;
+  rm: boolean;
 }) {
   const totalSets = exercise.sets ?? 1;
   const isTimeBased = exercise.durationSeconds != null;
@@ -326,50 +442,56 @@ function ExerciseRow({
     ? TECHNIQUE_COLORS[exercise.setTechnique] ?? "text-gray-500"
     : "";
 
+  // Build prescription chips
+  const chips: Array<{ text: string; mono?: boolean; className?: string }> = [];
+  if (exercise.setTechnique && exercise.setTechnique !== "straight_set") {
+    chips.push({ text: fmtLabel(exercise.setTechnique), className: techniqueClass + " font-bold" });
+  }
+  if (exercise.tempo) chips.push({ text: exercise.tempo, mono: true });
+  if (exercise.restSeconds) chips.push({ text: `${exercise.restSeconds}s rest` });
+  if (exercise.targetRpe) chips.push({ text: `RPE ${exercise.targetRpe}` });
+  if (exercise.targetRir) chips.push({ text: `${exercise.targetRir} RIR` });
+
   return (
-    <div className="border border-white/[0.05] bg-[#0a0b0c] mb-2">
+    <div className="border border-white/[0.05] bg-[#0a0b0c] mb-3 overflow-hidden">
       {/* Exercise header */}
-      <div className="px-4 py-3">
+      <div className="px-4 pt-4 pb-3">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-white text-sm font-semibold leading-tight">
+          <div className="min-w-0 flex-1">
+            <p className="text-white text-[15px] font-semibold leading-snug">
               {exercise.exerciseName}
             </p>
-            <div className="flex items-center gap-3 mt-1 flex-wrap">
-              {exercise.setTechnique && exercise.setTechnique !== "straight_set" && (
-                <span className={`text-[10px] font-semibold ${techniqueClass}`}>
-                  {fmtLabel(exercise.setTechnique)}
-                </span>
-              )}
-              {exercise.tempo && (
-                <span className="text-[10px] text-gray-600 font-mono">{exercise.tempo}</span>
-              )}
-              {exercise.restSeconds && (
-                <span className="text-[10px] text-gray-600">{exercise.restSeconds}s rest</span>
-              )}
-              {exercise.targetRpe && (
-                <span className="text-[10px] text-gray-600">Target RPE {exercise.targetRpe}</span>
-              )}
-              {exercise.targetRir && (
-                <span className="text-[10px] text-gray-600">{exercise.targetRir} RIR</span>
-              )}
-            </div>
+            {chips.length > 0 && (
+              <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                {chips.map((chip, i) => (
+                  <span
+                    key={i}
+                    className={`text-[9px] tracking-[0.06em] px-1.5 py-0.5 bg-white/[0.04] border border-white/[0.07] ${chip.mono ? "font-mono" : ""} ${chip.className ?? "text-gray-400"}`}
+                  >
+                    {chip.text}
+                  </span>
+                ))}
+              </div>
+            )}
             {exercise.coachNotes && (
-              <p className="text-gray-600 text-[11px] italic mt-1.5 leading-relaxed">
+              <p className="text-gray-400 text-[11px] italic mt-2 leading-relaxed">
                 {exercise.coachNotes}
               </p>
             )}
           </div>
           <div className="text-right shrink-0">
-            <p className="text-[#C9A24D] font-bold text-base leading-tight">
+            <p className="text-[#C9A24D] font-bold text-lg leading-tight">
               {totalSets}×{repRange(exercise)}
             </p>
           </div>
         </div>
       </div>
 
+      {/* Divider */}
+      <div className="h-px bg-white/[0.04] mx-4" />
+
       {/* Set rows */}
-      <div className="px-4 pb-3">
+      <div className="px-4 pb-2 pt-0.5">
         {Array.from({ length: totalSets }, (_, i) => i + 1).map((setNum) => (
           <SetRow
             key={setNum}
@@ -379,6 +501,7 @@ function ExerciseRow({
             onUpdate={(patch) => onUpdate(exercise.id, setNum, patch)}
             onLog={() => onLog(exercise.id, setNum)}
             onCorrect={() => onCorrect(exercise.id, setNum)}
+            rm={rm}
           />
         ))}
       </div>
@@ -396,25 +519,27 @@ function SectionBlock({
   onUpdate,
   onLog,
   onCorrect,
+  rm,
 }: {
   section: SectionItem;
   setStates: Map<string, SetData>;
   onUpdate: (exerciseId: string, setNum: number, patch: Partial<SetData>) => void;
   onLog: (exerciseId: string, setNum: number) => void;
   onCorrect: (exerciseId: string, setNum: number) => void;
+  rm: boolean;
 }) {
   const sortedExercises = [...section.exercises].sort((a, b) => a.orderIndex - b.orderIndex);
 
   return (
-    <div className="mb-5">
+    <div className="mb-6">
       <div className="flex items-center gap-3 mb-3">
-        <p className="text-[9px] text-gray-600 uppercase tracking-[0.5em] font-semibold">
+        <p className="text-[9px] text-gray-400 uppercase tracking-[0.5em] font-semibold">
           {section.name}
         </p>
         {section.estimatedMinutes && (
-          <span className="text-gray-700 text-[10px]">{section.estimatedMinutes} min</span>
+          <span className="text-gray-500 text-[10px]">{section.estimatedMinutes} min</span>
         )}
-        <div className="flex-1 h-px bg-white/[0.04]" />
+        <div className="flex-1 h-px bg-white/[0.04]" aria-hidden />
       </div>
       {sortedExercises.map((ex) => (
         <ExerciseRow
@@ -424,6 +549,7 @@ function SectionBlock({
           onUpdate={onUpdate}
           onLog={onLog}
           onCorrect={onCorrect}
+          rm={rm}
         />
       ))}
     </div>
@@ -444,15 +570,78 @@ export default function WorkoutSession({
 }: Props) {
   const [setStates, setSetStates] = useState<Map<string, SetData>>(new Map());
   const [finishing, setFinishing] = useState(false);
+  const [restTimer, setRestTimer] = useState<RestTimer | null>(null);
 
-  const allExercises = [
-    ...snapshot.sections.flatMap((s) => s.exercises),
-    ...snapshot.unsectioned,
-  ];
-  const totalSets = allExercises.reduce((s, ex) => s + (ex.sets ?? 1), 0);
-  const doneSets = [...setStates.values()].filter((d) => d.status === "done").length;
+  // Detect reduced motion once on mount — stable for session lifetime
+  const [rm] = useState<boolean>(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      : false,
+  );
+
+  // Capture session start time on mount
+  const [startedAt] = useState<Date>(() => new Date());
+
+  const allExercises = useMemo(
+    () => [
+      ...snapshot.sections.flatMap((s) => s.exercises),
+      ...snapshot.unsectioned,
+    ],
+    [snapshot.sections, snapshot.unsectioned],
+  );
+
+  const totalSets = useMemo(
+    () => allExercises.reduce((s, ex) => s + (ex.sets ?? 1), 0),
+    [allExercises],
+  );
+
+  const doneSets = useMemo(
+    () => [...setStates.values()].filter((d) => d.status === "done").length,
+    [setStates],
+  );
+
   const pct = totalSets > 0 ? Math.min(100, Math.round((doneSets / totalSets) * 100)) : 0;
 
+  const completedExerciseCount = useMemo(() => {
+    return allExercises.filter((ex) => {
+      const total = ex.sets ?? 1;
+      for (let n = 1; n <= total; n++) {
+        if ((setStates.get(sKey(ex.id, n))?.status ?? "idle") !== "done") return false;
+      }
+      return true;
+    }).length;
+  }, [allExercises, setStates]);
+
+  const estimatedFinish = useMemo(() => {
+    if (!snapshot.estimatedDurationMinutes) return null;
+    return new Date(startedAt.getTime() + snapshot.estimatedDurationMinutes * 60 * 1000);
+  }, [startedAt, snapshot.estimatedDurationMinutes]);
+
+  // ── Rest timer countdown ──────────────────────────────────
+  useEffect(() => {
+    if (!restTimer || restTimer.done) return;
+    if (restTimer.remaining <= 0) {
+      setRestTimer((t) => (t ? { ...t, done: true } : null));
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        navigator.vibrate([100, 60, 200]);
+      }
+      return;
+    }
+    const id = setTimeout(() => {
+      setRestTimer((t) => (t && !t.done ? { ...t, remaining: t.remaining - 1 } : t));
+    }, 1000);
+    return () => clearTimeout(id);
+  }, [restTimer]);
+
+  // ── Auto-dismiss 3 s after rest completes ────────────────
+  const timerDone = restTimer?.done ?? false;
+  useEffect(() => {
+    if (!timerDone) return;
+    const id = setTimeout(() => setRestTimer(null), 3000);
+    return () => clearTimeout(id);
+  }, [timerDone]);
+
+  // ── State helpers ────────────────────────────────────────
   function updateSetState(exerciseId: string, setNum: number, patch: Partial<SetData>) {
     const key = sKey(exerciseId, setNum);
     setSetStates((prev) => {
@@ -462,6 +651,7 @@ export default function WorkoutSession({
     });
   }
 
+  // ── Log a set ────────────────────────────────────────────
   async function handleLog(exerciseId: string, setNum: number) {
     const data = setStates.get(sKey(exerciseId, setNum)) ?? DEFAULT_SET;
 
@@ -510,6 +700,17 @@ export default function WorkoutSession({
         loggedRpe: rpeNum,
         errorMsg: "",
       });
+
+      // Start rest timer if this exercise has a prescribed rest period
+      const exercise = allExercises.find((e) => e.id === exerciseId);
+      if (exercise?.restSeconds) {
+        setRestTimer({
+          exerciseName: exercise.exerciseName,
+          totalSeconds: exercise.restSeconds,
+          remaining: exercise.restSeconds,
+          done: false,
+        });
+      }
     } catch {
       updateSetState(exerciseId, setNum, {
         status: "error",
@@ -544,100 +745,140 @@ export default function WorkoutSession({
     }
   }
 
-  const sortedSections = [...snapshot.sections].sort((a, b) => a.orderIndex - b.orderIndex);
-  const sortedUnsectioned = [...snapshot.unsectioned].sort((a, b) => a.orderIndex - b.orderIndex);
+  const sortedSections = useMemo(
+    () => [...snapshot.sections].sort((a, b) => a.orderIndex - b.orderIndex),
+    [snapshot.sections],
+  );
+  const sortedUnsectioned = useMemo(
+    () => [...snapshot.unsectioned].sort((a, b) => a.orderIndex - b.orderIndex),
+    [snapshot.unsectioned],
+  );
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      {/* Workout header */}
-      <div className="mb-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-[9px] text-gray-600 uppercase tracking-[0.5em] mb-1">
-              {programWeekNumber ? `Week ${programWeekNumber}` : "Today's Workout"}
-              {scheduledDate &&
-                ` · ${new Date(scheduledDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}`}
-            </p>
-            <h2 className="text-white text-xl font-bold tracking-wide">
-              {snapshot.templateName}
-            </h2>
-            {snapshot.estimatedDurationMinutes && (
-              <p className="text-gray-600 text-xs mt-1">
-                ~{snapshot.estimatedDurationMinutes} min
+    <>
+      {/* Rest timer — fixed bottom, above mobile nav */}
+      {restTimer && (
+        <RestTimerPanel timer={restTimer} onDismiss={() => setRestTimer(null)} rm={rm} />
+      )}
+
+      <div
+        className="max-w-2xl mx-auto px-4 py-6"
+        style={restTimer ? { paddingBottom: "5rem" } : undefined}
+      >
+        {/* ── Workout header ──────────────────────────────────── */}
+        <div className="mb-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[9px] text-gray-400 uppercase tracking-[0.5em] mb-1">
+                {programWeekNumber ? `Week ${programWeekNumber}` : "Today's Workout"}
+                {scheduledDate &&
+                  ` · ${new Date(scheduledDate + "T12:00:00").toLocaleDateString("en-US", {
+                    weekday: "long",
+                    month: "short",
+                    day: "numeric",
+                  })}`}
               </p>
+              <h2 className="text-white text-xl font-bold tracking-wide leading-tight">
+                {snapshot.templateName}
+              </h2>
+            </div>
+            <button
+              onClick={onCancel}
+              className="text-gray-500 text-[10px] hover:text-gray-300 transition-colors uppercase tracking-widest shrink-0 mt-1"
+            >
+              ✕ Close
+            </button>
+          </div>
+
+          {/* Started · Est. Finish */}
+          <div className="flex items-center gap-3 mt-2 text-[10px] text-gray-500">
+            <span>Started {fmtTime(startedAt)}</span>
+            {estimatedFinish && (
+              <>
+                <span aria-hidden>·</span>
+                <span>Est. finish {fmtTime(estimatedFinish)}</span>
+              </>
             )}
           </div>
+
+          {/* Progress */}
+          <div className="mt-4" role="region" aria-label="Workout progress">
+            <div className="h-0.5 bg-white/[0.07] rounded-full overflow-hidden mb-2">
+              <div
+                className="h-full bg-[#C9A24D] rounded-full"
+                role="progressbar"
+                aria-valuenow={pct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Completion percentage"
+                style={{
+                  width: `${pct}%`,
+                  transition: rm ? "none" : "width 500ms ease-out",
+                }}
+              />
+            </div>
+            <div className="flex items-center gap-3 text-[10px]">
+              <span className="text-[#C9A24D] font-bold">{pct}%</span>
+              <span className="text-gray-400">
+                {doneSets} / {totalSets} sets
+              </span>
+              {allExercises.length > 0 && (
+                <span className="text-gray-500">
+                  {completedExerciseCount} / {allExercises.length} exercises
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Legend */}
+        {totalSets > 0 && (
+          <p className="text-[10px] text-gray-500 mb-5">
+            Weight · Reps · RPE are optional — log what you tracked.
+          </p>
+        )}
+
+        {/* Sections */}
+        {sortedSections.map((sec) => (
+          <SectionBlock
+            key={sec.id}
+            section={sec}
+            setStates={setStates}
+            onUpdate={updateSetState}
+            onLog={handleLog}
+            onCorrect={handleCorrect}
+            rm={rm}
+          />
+        ))}
+
+        {/* Unsectioned */}
+        {sortedUnsectioned.length > 0 && (
+          <div className="mb-5">
+            {sortedUnsectioned.map((ex) => (
+              <ExerciseRow
+                key={ex.id}
+                exercise={ex}
+                setStates={setStates}
+                onUpdate={updateSetState}
+                onLog={handleLog}
+                onCorrect={handleCorrect}
+                rm={rm}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Finish */}
+        <div className="mt-8 border-t border-white/[0.06] pt-6">
           <button
-            onClick={onCancel}
-            className="text-gray-700 text-[10px] hover:text-gray-400 transition-colors uppercase tracking-widest shrink-0"
+            onClick={handleFinish}
+            disabled={finishing}
+            className="w-full bg-[#C9A24D] text-black font-bold text-[11px] tracking-[0.3em] uppercase py-4 hover:bg-[#D4B56A] transition-colors disabled:opacity-50 min-h-[52px]"
           >
-            ✕ Close
+            {finishing ? "Saving…" : `Finish Workout${pct > 0 ? ` — ${pct}%` : ""}`}
           </button>
         </div>
-
-        {/* Progress bar */}
-        <div className="mt-4">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] text-gray-600 uppercase tracking-[0.3em]">Progress</span>
-            <span className="text-[10px] text-[#C9A24D] font-bold">{pct}%</span>
-          </div>
-          <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-[#C9A24D] transition-all duration-300"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          <p className="text-gray-700 text-[10px] mt-1">
-            {doneSets} / {totalSets} sets logged
-          </p>
-        </div>
       </div>
-
-      {/* Legend */}
-      {totalSets > 0 && (
-        <div className="flex items-center gap-4 mb-4 text-[10px] text-gray-700">
-          <span>Weight · Reps · RPE are optional — log what you tracked.</span>
-        </div>
-      )}
-
-      {/* Sections */}
-      {sortedSections.map((sec) => (
-        <SectionBlock
-          key={sec.id}
-          section={sec}
-          setStates={setStates}
-          onUpdate={updateSetState}
-          onLog={handleLog}
-          onCorrect={handleCorrect}
-        />
-      ))}
-
-      {/* Unsectioned */}
-      {sortedUnsectioned.length > 0 && (
-        <div className="mb-5">
-          {sortedUnsectioned.map((ex) => (
-            <ExerciseRow
-              key={ex.id}
-              exercise={ex}
-              setStates={setStates}
-              onUpdate={updateSetState}
-              onLog={handleLog}
-              onCorrect={handleCorrect}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Finish button */}
-      <div className="mt-8 border-t border-white/[0.06] pt-6">
-        <button
-          onClick={handleFinish}
-          disabled={finishing}
-          className="w-full bg-[#C9A24D] text-black font-bold text-[11px] tracking-[0.3em] uppercase py-4 hover:bg-[#D4B56A] transition-colors disabled:opacity-50"
-        >
-          {finishing ? "Saving…" : `Finish Workout${pct > 0 ? ` — ${pct}%` : ""}`}
-        </button>
-      </div>
-    </div>
+    </>
   );
 }

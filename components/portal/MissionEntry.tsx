@@ -137,13 +137,16 @@ export default function MissionEntry({ clientName, scenario, onComplete }: Props
 
         {/* ── Step 2: Greeting ──────────────────────────── */}
         <div
-          className="flex flex-col gap-0.5 -mt-2"
+          className="flex flex-col gap-0.5 -mt-2 w-full min-w-0"
           style={fadeUp(step >= 2, 450, 0)}
         >
-          <p className="font-headline text-2xl md:text-3xl uppercase tracking-[0.1em] text-white/38 leading-none">
+          <p className="font-headline text-xl sm:text-2xl md:text-3xl uppercase tracking-[0.1em] text-white/38 leading-none">
             {line1}
           </p>
-          <h1 className="font-headline text-5xl md:text-[4.5rem] uppercase tracking-[0.04em] text-white leading-tight">
+          <h1
+            className="font-headline uppercase tracking-[0.04em] text-white leading-tight break-words"
+            style={{ fontSize: "clamp(2rem, 10vw, 4.5rem)" }}
+          >
             {firstName}.
           </h1>
         </div>
