@@ -7,6 +7,7 @@
 
 import Link from "next/link";
 import { getCoachMissionControl, type AttentionLevel } from "@/lib/db/coach-dashboard-service";
+import HQPageHeader from "@/components/hq/HQPageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -67,19 +68,18 @@ export default async function MissionControlPage() {
 
   return (
     <div className="space-y-8">
-      {/* ── Header ───────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold tracking-wide text-white">Mission Control</h1>
-          <p className="text-[11px] text-gray-500 mt-0.5">{today}</p>
-        </div>
-        <Link
-          href="/hq/clients"
-          className="text-[10px] text-gray-500 uppercase tracking-[0.2em] hover:text-white/70 transition-colors border border-white/[0.07] px-3 py-1.5"
-        >
-          All Clients →
-        </Link>
-      </div>
+      <HQPageHeader
+        title="Mission Control"
+        subtitle={today}
+        action={
+          <Link
+            href="/hq/clients"
+            className="text-[10px] text-gray-500 uppercase tracking-[0.2em] hover:text-white/70 transition-colors border border-white/[0.07] px-3 py-1.5"
+          >
+            All Clients →
+          </Link>
+        }
+      />
 
       {/* ── Section A: Count cards ───────────────────────────── */}
       <section aria-label="Summary counts">

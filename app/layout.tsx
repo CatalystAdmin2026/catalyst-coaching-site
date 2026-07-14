@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { Barlow_Condensed } from "next/font/google";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import "./globals.css";
 
 const geist = Geist({
@@ -42,12 +40,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body
-        className={`${geist.variable} ${barlowCondensed.variable} antialiased`}
-      >
-        <Navbar />
+      <body className={`${geist.variable} ${barlowCondensed.variable} antialiased`}>
         {children}
-        <Footer />
       </body>
     </html>
   );

@@ -105,7 +105,7 @@ export interface CoachClientDetail extends CoachClientSummary {
 // data sources exist.
 // ─────────────────────────────────────────────────────────────
 
-interface AttentionInput {
+export interface AttentionInput {
   activeProgramId: string | null;
   completedLast7d: number;
   skippedLast30d: number;
@@ -114,7 +114,7 @@ interface AttentionInput {
   programEndDate: string | null;
 }
 
-function computeAttention(input: AttentionInput): { level: AttentionLevel; reason: string } {
+export function computeAttention(input: AttentionInput): { level: AttentionLevel; reason: string } {
   const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -156,14 +156,14 @@ function computeAttention(input: AttentionInput): { level: AttentionLevel; reaso
 
 // Compliance = completed / (completed + skipped) over last 30 days.
 // Returns null if fewer than 3 sessions — not enough to be meaningful.
-function computeCompliancePct(completedLast30d: number, skippedLast30d: number): number | null {
+export function computeCompliancePct(completedLast30d: number, skippedLast30d: number): number | null {
   const total = completedLast30d + skippedLast30d;
   if (total < 3) return null;
   return Math.round((completedLast30d / total) * 100);
 }
 
 // Week 1 starts on program start date; advances every 7 days.
-function computeCurrentWeek(startDateStr: string): number {
+export function computeCurrentWeek(startDateStr: string): number {
   const startDate = new Date(startDateStr + "T00:00:00Z");
   const diffDays = Math.floor((Date.now() - startDate.getTime()) / (1000 * 60 * 60 * 24));
   return Math.max(1, Math.floor(diffDays / 7) + 1);

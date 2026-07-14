@@ -7,10 +7,10 @@ import Image from "next/image";
 import { Menu, X, LayoutDashboard, Users, BookOpen, FileText } from "lucide-react";
 
 const MAIN_NAV = [
-  { icon: LayoutDashboard, label: "Mission Control", href: "/hq",         exact: true },
-  { icon: Users,           label: "Clients",         href: "/hq/clients"             },
-  { icon: BookOpen,        label: "Programs",        href: "/admin/programs",  ext: true },
-  { icon: FileText,        label: "Blueprints",      href: "/admin/blueprints", ext: true },
+  { icon: LayoutDashboard, label: "Mission Control", href: "/hq",           exact: true },
+  { icon: Users,           label: "Clients",         href: "/hq/clients"               },
+  { icon: BookOpen,        label: "Programs",        href: "/hq/programs"              },
+  { icon: FileText,        label: "Blueprints",      href: "/hq/blueprints"            },
 ];
 
 export default function HQMobileNav({ coachName }: { coachName: string }) {
@@ -26,7 +26,7 @@ export default function HQMobileNav({ coachName }: { coachName: string }) {
     <>
       {/* Top bar — mobile only */}
       <header className="lg:hidden fixed top-0 inset-x-0 z-40 h-12 bg-[#0b0c0d]/95 backdrop-blur-sm border-b border-white/[0.06] flex items-center px-4 gap-3">
-        <Image src="/logos/mark-gold.png" alt="Catalyst HQ" width={16} height={16} className="opacity-80" />
+        <Image src="/logos/mark-gold.png" alt="Catalyst HQ" width={14} height={14} className="opacity-80" />
         <span className="text-[9px] font-bold tracking-[0.3em] text-[#C9A24D]/80 uppercase flex-1">
           Catalyst HQ
         </span>
@@ -42,35 +42,23 @@ export default function HQMobileNav({ coachName }: { coachName: string }) {
       {/* Drawer overlay */}
       {open && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
-          {/* Scrim */}
-          <div
-            className="absolute inset-0 bg-black/60"
-            onClick={() => setOpen(false)}
-          />
-          {/* Drawer panel */}
+          <div className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} />
           <div className="relative w-64 bg-[#0b0c0d] border-r border-white/[0.08] flex flex-col h-full">
-            {/* Header */}
             <div className="flex items-center gap-2.5 px-5 h-12 border-b border-white/[0.06]">
-              <Image src="/logos/mark-gold.png" alt="" width={16} height={16} className="opacity-80" />
+              <Image src="/logos/mark-gold.png" alt="" width={14} height={14} className="opacity-80" />
               <span className="text-[9px] font-bold tracking-[0.3em] text-[#C9A24D]/80 uppercase flex-1">
                 Catalyst HQ
               </span>
-              <button
-                onClick={() => setOpen(false)}
-                aria-label="Close navigation"
-                className="text-white/40 hover:text-white/70"
-              >
+              <button onClick={() => setOpen(false)} aria-label="Close navigation" className="text-white/40 hover:text-white/70">
                 <X size={16} />
               </button>
             </div>
 
-            {/* Nav items */}
             <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-              {MAIN_NAV.map(({ icon: Icon, label, href, exact, ext }) => {
+              {MAIN_NAV.map(({ icon: Icon, label, href, exact }) => {
                 const active = isActive(href, exact);
-                const Tag = ext ? "a" : Link;
                 return (
-                  <Tag
+                  <Link
                     key={label}
                     href={href}
                     onClick={() => setOpen(false)}
@@ -82,7 +70,7 @@ export default function HQMobileNav({ coachName }: { coachName: string }) {
                   >
                     <Icon size={15} className={active ? "text-[#C9A24D]" : "text-white/30"} />
                     {label}
-                  </Tag>
+                  </Link>
                 );
               })}
 
@@ -98,7 +86,6 @@ export default function HQMobileNav({ coachName }: { coachName: string }) {
               </div>
             </nav>
 
-            {/* Coach identity */}
             <div className="px-4 py-3 border-t border-white/[0.06]">
               <p className="text-[10px] text-white/30 truncate">{coachName}</p>
             </div>

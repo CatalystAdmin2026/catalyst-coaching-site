@@ -3,11 +3,11 @@
 // Non-disclosing 404: returns notFound() if session doesn't belong to clientId.
 
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import {
   getCoachClientSessionDetail,
   type HistoricalSetLog,
 } from "@/lib/db/coach-dashboard-service";
+import HQBreadcrumbs from "@/components/hq/HQBreadcrumbs";
 
 export const dynamic = "force-dynamic";
 
@@ -240,13 +240,12 @@ export default async function CoachSessionReviewPage({
 
   return (
     <div className="max-w-2xl">
-      {/* ── Back nav ──────────────────────────────────────────── */}
-      <Link
-        href={`/hq/clients/${clientId}`}
-        className="inline-flex items-center gap-1.5 text-gray-500 text-[11px] uppercase tracking-[0.15em] hover:text-white/70 transition-colors mb-6"
-      >
-        ← Client
-      </Link>
+      <HQBreadcrumbs crumbs={[
+        { label: "Mission Control", href: "/hq" },
+        { label: "Clients",         href: "/hq/clients" },
+        { label: "Client",          href: `/hq/clients/${clientId}` },
+        { label: "Workout Review" },
+      ]} />
 
       {/* ── Read-only badge ───────────────────────────────────── */}
       <div className="mb-4 inline-flex items-center gap-1.5 border border-white/[0.06] px-2.5 py-1">
