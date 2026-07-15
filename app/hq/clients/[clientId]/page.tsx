@@ -13,11 +13,13 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getCoachClientWorkspace } from "@/lib/db/coach-client-workspace-service";
+import { listAssignableBlueprints, getClientProgramHistory } from "@/lib/db/coach-program-assignment-service";
 import HQBreadcrumbs from "@/components/hq/HQBreadcrumbs";
+import AssignProgramButton from "@/components/hq/workspace/AssignProgramButton";
+import AssignProgramModal from "@/components/hq/workspace/AssignProgramModal";
+import ProgramTimeline from "@/components/hq/workspace/ProgramTimeline";
 import type {
   CoachClientWorkspace,
-  ActiveProgramInfo,
-  WeekDaySchedule,
   ExercisePerformance,
   BodyCompSnapshot,
   WorkspaceGoal,
@@ -51,10 +53,6 @@ function fmtRelative(d: Date | null): string {
   if (diffDays === 1) return "Yesterday";
   if (diffDays < 7) return `${diffDays}d ago`;
   return `${Math.floor(diffDays / 7)}w ago`;
-}
-
-function fmtDayName(dow: number): string {
-  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dow];
 }
 
 function attentionColor(level: AttentionLevel) {
@@ -131,7 +129,13 @@ function EmptyState({ message }: { message: string }) {
 // SECTION: CLIENT HEADER
 // ─────────────────────────────────────────────────────────────
 
-function ClientHeader({ w }: { w: CoachClientWorkspace }) {
+function ClientHeader({
+  w,
+  assignAction,
+}: {
+  w: CoachClientWorkspace;
+  assignAction: React.ReactNode;
+}) {
   const displayName = w.preferredName ?? w.fullName;
   const statusMap: Record<string, string> = {
     active: "text-emerald-400 border-emerald-500/30",
@@ -178,27 +182,14 @@ function ClientHeader({ w }: { w: CoachClientWorkspace }) {
       </div>
 
       {/* Quick actions */}
-      <div className="flex flex-wrap gap-2 shrink-0">
+      <div className="flex flex-wrap items-center gap-2 shrink-0">
         <Link
           href="/hq/clients"
           className="text-[10px] text-gray-500 uppercase tracking-[0.2em] hover:text-white/70 border border-white/[0.07] px-3 py-1.5 transition-colors"
         >
           ← Clients
         </Link>
-        {w.activeProgram && (
-          <Link
-            href={`/admin/programs`}
-            className="text-[10px] text-[#C9A24D]/70 uppercase tracking-[0.2em] hover:text-[#C9A24D] border border-[#C9A24D]/20 px-3 py-1.5 transition-colors"
-          >
-            Open Program
-          </Link>
-        )}
-        <Link
-          href={`/admin/programs`}
-          className="text-[10px] text-gray-500 uppercase tracking-[0.2em] hover:text-white/70 border border-white/[0.07] px-3 py-1.5 transition-colors"
-        >
-          {w.activeProgram ? "Reassign" : "Assign Program"}
-        </Link>
+        {assignAction}
       </div>
     </div>
   );
@@ -309,171 +300,7 @@ function CoachingSnapshot({ w }: { w: CoachClientWorkspace }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// SECTION: CURRENT PROGRAM
-// ─────────────────────────────────────────────────────────────
-
-function CurrentProgramPanel({ program, clientId }: { program: ActiveProgramInfo | null; clientId: string }) {
-  if (!program) {
-    return (
-      <section>
-        <SectionHeader
-          title="Active Program"
-          action={
-            <Link
-              href="/admin/programs"
-              className="text-[10px] text-[#C9A24D]/70 uppercase tracking-[0.2em] hover:text-[#C9A24D] transition-colors border border-[#C9A24D]/20 px-2.5 py-1"
-            >
-              Assign →
-            </Link>
-          }
-        />
-        <div className="border border-dashed border-red-500/20 bg-red-500/[0.03] px-5 py-5 text-center">
-          <p className="text-red-400 text-sm font-medium">No active program</p>
-          <p className="text-gray-600 text-xs mt-1">
-            Assign a program from{" "}
-            <Link href="/admin/programs" className="text-gray-400 underline hover:text-white">
-              Admin → Programs
-            </Link>
-          </p>
-        </div>
-      </section>
-    );
-  }
-
-  const schedule = program.currentWeekSchedule;
-
-  return (
-    <section>
-      <SectionHeader
-        title="Active Program"
-        action={
-          <Link
-            href="/admin/programs"
-            className="text-[10px] text-gray-500 uppercase tracking-[0.2em] hover:text-gray-300 transition-colors"
-          >
-            Manage →
-          </Link>
-        }
-      />
-
-      {/* Program header row */}
-      <div className="bg-[#0d0e0f] border border-white/[0.06] px-5 py-4 mb-3">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <p className="text-white font-semibold text-base">{program.name}</p>
-            <div className="flex items-center gap-3 mt-1 flex-wrap">
-              {program.startDate && (
-                <span className="text-gray-500 text-[10px]">Started {fmtDate(program.startDate)}</span>
-              )}
-              {(program.endDate ?? program.derivedEndDate) && (
-                <span className="text-gray-500 text-[10px]">
-                  Ends {fmtDate(program.endDate ?? program.derivedEndDate)}
-                </span>
-              )}
-              {program.daysRemaining !== null && (
-                <span
-                  className={`text-[10px] font-semibold ${
-                    program.daysRemaining <= 7 ? "text-amber-400" : "text-gray-400"
-                  }`}
-                >
-                  {program.daysRemaining}d remaining
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-6 shrink-0">
-            {program.totalWeeks && (
-              <div className="text-right">
-                <p className="text-[#C9A24D] text-2xl font-bold leading-none">{program.currentWeek}</p>
-                <p className="text-gray-500 text-[9px] uppercase tracking-[0.3em]">/ {program.totalWeeks} wks</p>
-              </div>
-            )}
-            {program.programCompletionPct !== null && (
-              <div className="text-right">
-                <p className="text-white text-lg font-bold leading-none">{program.programCompletionPct}%</p>
-                <p className="text-gray-600 text-[9px] uppercase tracking-[0.2em]">complete</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Progress bar */}
-        {program.programCompletionPct !== null && (
-          <div className="mt-3 h-px bg-white/[0.06] relative overflow-hidden">
-            <div
-              className="absolute inset-y-0 left-0 bg-[#C9A24D]/60"
-              style={{ width: `${Math.min(100, program.programCompletionPct)}%` }}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Current week schedule */}
-      {schedule.length > 0 && (
-        <div>
-          <p className="text-[9px] text-gray-600 uppercase tracking-[0.4em] mb-2">
-            Week {program.currentWeek} Schedule
-          </p>
-          <div className="grid grid-cols-7 gap-1">
-            {schedule.map((day) => (
-              <WeekDayCell key={day.dayOfWeek} day={day} clientId={clientId} />
-            ))}
-          </div>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function WeekDayCell({ day, clientId }: { day: WeekDaySchedule; clientId: string }) {
-  const bg = day.isRestDay
-    ? "bg-[#0a0b0c] border-white/[0.03]"
-    : day.sessionStatus === "completed"
-    ? "bg-emerald-500/[0.08] border-emerald-500/20"
-    : day.sessionStatus === "skipped"
-    ? "bg-white/[0.02] border-white/[0.04]"
-    : "bg-[#0d0e0f] border-white/[0.06]";
-
-  const Content = (
-    <div className={`border px-1.5 py-2 text-center min-h-[64px] flex flex-col justify-between ${bg}`}>
-      <p className="text-[9px] text-gray-600 uppercase tracking-[0.2em]">{fmtDayName(day.dayOfWeek)}</p>
-      {day.isRestDay ? (
-        <p className="text-[8px] text-gray-700 mt-1">Rest</p>
-      ) : (
-        <>
-          <p className="text-[9px] text-white/70 leading-tight mt-0.5 line-clamp-2 text-left px-0.5">
-            {day.workoutName ?? "Workout"}
-          </p>
-          <div className="flex justify-center mt-1">
-            {day.sessionStatus === "completed" && (
-              <span className="text-emerald-400 text-[10px]">✓</span>
-            )}
-            {day.sessionStatus === "skipped" && (
-              <span className="text-gray-600 text-[10px]">—</span>
-            )}
-            {day.sessionStatus === "upcoming" && (
-              <span className="text-gray-600 text-[8px]">○</span>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-
-  if (day.sessionId) {
-    return (
-      <Link
-        href={`/hq/clients/${clientId}/history/${day.sessionId}`}
-        className="hover:opacity-80 transition-opacity"
-      >
-        {Content}
-      </Link>
-    );
-  }
-
-  return Content;
-}
+// CurrentProgramPanel and WeekDayCell replaced by ProgramTimeline (Sprint 6.3A)
 
 // ─────────────────────────────────────────────────────────────
 // SECTION: TRAINING PERFORMANCE
@@ -1044,11 +871,17 @@ export default async function ClientWorkspacePage({
   params: Promise<{ clientId: string }>;
 }) {
   const { clientId } = await params;
-  const workspace = await getCoachClientWorkspace(clientId);
+
+  const [workspace, blueprints, programHistory] = await Promise.all([
+    getCoachClientWorkspace(clientId),
+    listAssignableBlueprints(),
+    getClientProgramHistory(clientId),
+  ]);
 
   if (!workspace) notFound();
 
   const displayName = workspace.preferredName ?? workspace.fullName;
+  const hasActiveProgram = !!workspace.activeProgram;
 
   return (
     <div className="space-y-8 max-w-[1200px]">
@@ -1058,8 +891,13 @@ export default async function ClientWorkspacePage({
         { label: displayName },
       ]} />
 
-      {/* Header */}
-      <ClientHeader w={workspace} />
+      {/* Header — gold "Assign / Replace Program" CTA */}
+      <ClientHeader
+        w={workspace}
+        assignAction={
+          <AssignProgramButton variant="header" hasActiveProgram={hasActiveProgram} />
+        }
+      />
 
       {/* Attention banner */}
       <AttentionBanner level={workspace.attentionLevel} reason={workspace.attentionReason} />
@@ -1071,7 +909,17 @@ export default async function ClientWorkspacePage({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left: 2/3 */}
         <div className="lg:col-span-2 space-y-8">
-          <CurrentProgramPanel program={workspace.activeProgram} clientId={clientId} />
+          {/* Program Timeline replaces static program card */}
+          <ProgramTimeline
+            activeProgram={workspace.activeProgram}
+            programHistory={programHistory}
+            emptyStateAction={
+              <AssignProgramButton variant="primary" hasActiveProgram={false} />
+            }
+            replaceAction={
+              <AssignProgramButton variant="section" hasActiveProgram={hasActiveProgram} />
+            }
+          />
           <TrainingPerformance
             recentSessions={workspace.recentSessions}
             setAnalytics={workspace.sessionStats.setAnalytics}
@@ -1100,6 +948,14 @@ export default async function ClientWorkspacePage({
       <ActivityTimeline events={workspace.activityTimeline} />
 
       <CoachNotesComingSoon />
+
+      {/* Assignment modal — mounted once, opened via custom event */}
+      <AssignProgramModal
+        clientId={clientId}
+        hasActiveProgram={hasActiveProgram}
+        activeProgramName={workspace.activeProgram?.name ?? null}
+        blueprints={blueprints}
+      />
     </div>
   );
 }

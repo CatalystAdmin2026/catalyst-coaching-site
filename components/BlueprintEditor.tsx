@@ -1339,9 +1339,10 @@ function AddSectionForm({
 export interface BlueprintEditorProps {
   templateId: string;
   initialData: BlueprintData;
+  backHref?: string;
 }
 
-export default function BlueprintEditor({ templateId, initialData }: BlueprintEditorProps) {
+export default function BlueprintEditor({ templateId, initialData, backHref = "/admin/blueprints" }: BlueprintEditorProps) {
   const [template, setTemplate] = useState<TemplateData>(initialData.template);
   const [sections, setSections] = useState<SectionData[]>(
     [...initialData.sections].sort((a, b) => a.section.orderIndex - b.section.orderIndex),
@@ -1426,7 +1427,7 @@ export default function BlueprintEditor({ templateId, initialData }: BlueprintEd
           <div className="flex items-center justify-between h-14 gap-4">
             <div className="flex items-center gap-4 min-w-0">
               <Link
-                href="/admin/blueprints"
+                href={backHref}
                 className="text-gray-600 hover:text-gray-400 text-xs tracking-widest uppercase font-semibold transition-colors shrink-0"
               >
                 ← Blueprints

@@ -63,5 +63,5 @@ export default function HQBlueprintEditorPage({
 
   if (!data) return null;
 
-  return <BlueprintEditor templateId={id} initialData={data} />;
+  return <BlueprintEditor templateId={id} initialData={data} backHref="/hq/blueprints" />;
 }

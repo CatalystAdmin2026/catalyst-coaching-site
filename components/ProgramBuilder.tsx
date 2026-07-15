@@ -504,9 +504,10 @@ interface Props {
   templateId: string;
   initialData: ProgramBuilderData;
   blueprints: BlueprintOption[];
+  backHref?: string;
 }
 
-export default function ProgramBuilder({ templateId, initialData, blueprints }: Props) {
+export default function ProgramBuilder({ templateId, initialData, blueprints, backHref = "/admin/programs" }: Props) {
   const [template, setTemplate] = useState(initialData.template);
   const [weeks, setWeeks] = useState(initialData.weeks);
   const [addingWeek, setAddingWeek] = useState(false);
@@ -572,7 +573,7 @@ export default function ProgramBuilder({ templateId, initialData, blueprints }: 
         <div className="max-w-screen-xl mx-auto px-4 md:px-8">
           <div className="flex items-center justify-between h-14 gap-4">
             <div className="flex items-center gap-4 min-w-0">
-              <Link href="/admin/programs" className="text-gray-600 hover:text-gray-400 text-xs tracking-widest uppercase font-semibold transition-colors shrink-0">
+              <Link href={backHref} className="text-gray-600 hover:text-gray-400 text-xs tracking-widest uppercase font-semibold transition-colors shrink-0">
                 ← Programs
               </Link>
               <div className="w-px h-4 bg-white/10 shrink-0" />

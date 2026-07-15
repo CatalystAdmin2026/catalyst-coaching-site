@@ -73,5 +73,5 @@ export default function HQProgramEditorPage({
 
   if (!data) return null;
 
-  return <ProgramBuilder templateId={id} initialData={data} blueprints={blueprints} />;
+  return <ProgramBuilder templateId={id} initialData={data} blueprints={blueprints} backHref="/hq/programs" />;
 }
