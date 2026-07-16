@@ -3,36 +3,28 @@
 //
 // Handles the magic-link redirect from Supabase Auth.
 // Exchanges the auth code for a session, syncs the user into
-// public.users, then redirects to the portal.
+// public.users, then redirects based on role and next param.
 //
 // Security:
-//   - Only accepts relative paths in the `next` parameter
-//   - Validates `next` against an explicit allowlist
+//   - Only accepts safe internal relative paths in `next`
+//   - Protocol-relative and absolute URLs are rejected
+//   - `next` must be authorized for the authenticated user's role
+//   - Falls back to role default if next is absent or unauthorized
 //   - Suspended/archived users are rejected after sync
 //   - Auth codes are single-use (Supabase enforces this)
 //   - No auth tokens or codes are logged
+//
+// Role fallbacks:
+//   admin  → /admin
+//   coach  → /hq
+//   client → /portal
 // ─────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { syncUserToPublic, getPublicUser } from "@/lib/auth/sync";
-
-// Paths that `next` is allowed to redirect to.
-// External URLs, /api/*, and other internal paths are rejected.
-const REDIRECT_ALLOWLIST = ["/portal", "/account"];
-
-function safeRedirectPath(next: string | null): string {
-  if (!next) return "/portal";
-  const decoded = decodeURIComponent(next);
-  // Must be a relative path starting with /
-  if (!decoded.startsWith("/")) return "/portal";
-  // Must be on the allowlist (exact or prefix match)
-  const allowed = REDIRECT_ALLOWLIST.some(
-    (p) => decoded === p || decoded.startsWith(p + "/"),
-  );
-  return allowed ? decoded : "/portal";
-}
+import { resolvePostLoginRedirect } from "@/lib/auth/redirect";
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
@@ -101,6 +93,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?error=access_denied`);
   }
 
-  const redirectPath = safeRedirectPath(next);
+  const role = dbUser?.role ?? "client";
+  const redirectPath = resolvePostLoginRedirect(next, role);
   return NextResponse.redirect(`${origin}${redirectPath}`);
 }

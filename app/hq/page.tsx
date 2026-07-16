@@ -83,47 +83,73 @@ export default async function MissionControlPage() {
 
       {/* ── Section A: Count cards ───────────────────────────── */}
       <section aria-label="Summary counts">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           {[
             {
               label: "Active Clients",
               value: data.activeClientCount,
               color: "text-white",
               note: null,
+              href: null,
             },
             {
               label: "Needs Attention",
               value: data.prioritizedClients.length,
               color: data.prioritizedClients.length > 0 ? "text-amber-400" : "text-white",
               note: null,
+              href: null,
             },
             {
               label: "No Program Assigned",
               value: data.noActiveProgramCount,
               color: data.noActiveProgramCount > 0 ? "text-red-400" : "text-white",
               note: null,
+              href: null,
+            },
+            {
+              label: "Check-Ins Waiting",
+              value: data.checkIns.waitingCount,
+              color: data.checkIns.waitingCount > 0 ? "text-blue-400" : "text-white",
+              note: data.checkIns.inReviewCount > 0 ? `${data.checkIns.inReviewCount} in review` : null,
+              href: data.checkIns.waitingCount > 0 ? "/hq/check-ins" : null,
             },
             {
               label: "Workouts Today",
               value: data.workoutsCompletedToday,
               color: "text-[#C9A24D]",
               note: null,
+              href: null,
             },
-          ].map(({ label, value, color, note }) => (
-            <div
-              key={label}
-              className="bg-[#0d0e0f] border border-white/[0.06] px-5 py-5 relative overflow-hidden"
-            >
-              <div className="h-px absolute top-0 inset-x-0 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
-              <p className={`text-3xl font-bold tabular-nums leading-none mb-2 ${color}`}>
-                {value}
-              </p>
-              <p className="text-[10px] text-gray-500 uppercase tracking-[0.3em] leading-relaxed">
-                {label}
-              </p>
-              {note && <p className="text-[10px] text-gray-600 mt-1">{note}</p>}
-            </div>
-          ))}
+          ].map(({ label, value, color, note, href }) => {
+            const inner = (
+              <>
+                <div className="h-px absolute top-0 inset-x-0 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+                <p className={`text-3xl font-bold tabular-nums leading-none mb-2 ${color}`}>
+                  {value}
+                </p>
+                <p className="text-[10px] text-gray-500 uppercase tracking-[0.3em] leading-relaxed">
+                  {label}
+                </p>
+                {note && <p className="text-[10px] text-gray-600 mt-1">{note}</p>}
+              </>
+            );
+            return href ? (
+              <Link
+                key={label}
+                href={href}
+                className="bg-[#0d0e0f] border border-white/[0.06] px-5 py-5 relative overflow-hidden hover:border-white/[0.12] transition-colors block"
+              >
+                {inner}
+              </Link>
+            ) : (
+              <div
+                key={label}
+                className="bg-[#0d0e0f] border border-white/[0.06] px-5 py-5 relative overflow-hidden"
+              >
+                {inner}
+              </div>
+            );
+          })}
         </div>
       </section>
 

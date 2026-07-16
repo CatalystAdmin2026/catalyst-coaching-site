@@ -100,7 +100,7 @@ function LoginContent() {
               Catalyst OS
             </p>
             <h1 className="text-lg font-semibold text-white/90 tracking-wide">
-              Client Portal
+              Catalyst Secure Access
             </h1>
           </div>
         </div>

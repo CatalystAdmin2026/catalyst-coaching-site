@@ -26,7 +26,7 @@ const NAV: NavItem[] = [
   { icon: Users,           label: "Clients",         href: "/hq/clients"                 },
   { icon: BookOpen,        label: "Programs",        href: "/hq/programs"                },
   { icon: FileText,        label: "Blueprints",      href: "/hq/blueprints"              },
-  { icon: ClipboardCheck,  label: "Check-Ins",       href: "/hq/check-ins",  comingSoon: true },
+  { icon: ClipboardCheck,  label: "Check-Ins",       href: "/hq/check-ins"               },
   { icon: Calendar,        label: "Schedule",        href: "/hq/schedule",   comingSoon: true },
   { icon: Folder,          label: "Documents",       href: "/hq/documents",  comingSoon: true },
 ];

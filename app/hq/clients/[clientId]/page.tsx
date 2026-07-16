@@ -14,6 +14,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getCoachClientWorkspace } from "@/lib/db/coach-client-workspace-service";
 import { listAssignableBlueprints, getClientProgramHistory } from "@/lib/db/coach-program-assignment-service";
+import { getClientCheckInSummary } from "@/lib/db/coach-check-in-service";
 import HQBreadcrumbs from "@/components/hq/HQBreadcrumbs";
 import AssignProgramButton from "@/components/hq/workspace/AssignProgramButton";
 import AssignProgramModal from "@/components/hq/workspace/AssignProgramModal";
@@ -872,10 +873,11 @@ export default async function ClientWorkspacePage({
 }) {
   const { clientId } = await params;
 
-  const [workspace, blueprints, programHistory] = await Promise.all([
+  const [workspace, blueprints, programHistory, checkInSummary] = await Promise.all([
     getCoachClientWorkspace(clientId),
     listAssignableBlueprints(),
     getClientProgramHistory(clientId),
+    getClientCheckInSummary(clientId),
   ]);
 
   if (!workspace) notFound();
@@ -941,6 +943,65 @@ export default async function ClientWorkspacePage({
 
       {/* Full-width sections */}
       <ProfileSummary w={workspace} />
+
+      {/* Check-In summary panel */}
+      <section>
+        <SectionHeader
+          title="Check-Ins"
+          action={
+            <Link
+              href={`/hq/check-ins?client=${clientId}`}
+              className="text-[10px] text-gray-500 hover:text-[#C9A24D] transition-colors uppercase tracking-[0.2em]"
+            >
+              View Queue →
+            </Link>
+          }
+        />
+        {checkInSummary.totalCheckIns === 0 ? (
+          <EmptyState message="No check-ins submitted yet." />
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="bg-[#0a0b0c] border border-white/[0.05] px-4 py-4">
+              <p className="text-2xl font-bold text-white tabular-nums">
+                {checkInSummary.totalCheckIns}
+              </p>
+              <p className="text-[9px] text-gray-600 uppercase tracking-[0.25em] mt-1">
+                Total Check-Ins
+              </p>
+            </div>
+            <div className="bg-[#0a0b0c] border border-white/[0.05] px-4 py-4">
+              <p className={`text-2xl font-bold tabular-nums ${
+                checkInSummary.pendingCount > 0 ? "text-blue-400" : "text-white"
+              }`}>
+                {checkInSummary.pendingCount}
+              </p>
+              <p className="text-[9px] text-gray-600 uppercase tracking-[0.25em] mt-1">
+                Pending Review
+              </p>
+            </div>
+            <div className="bg-[#0a0b0c] border border-white/[0.05] px-4 py-4">
+              {checkInSummary.lastCheckIn ? (
+                <>
+                  <p className="text-sm font-semibold text-white">
+                    Week of {fmtDate(checkInSummary.lastCheckIn.weekStartDate, true)}
+                  </p>
+                  <p className="text-[9px] text-gray-600 uppercase tracking-[0.25em] mt-1">
+                    Last Check-In · {checkInSummary.lastCheckIn.status}
+                  </p>
+                  <Link
+                    href={`/hq/check-ins/${checkInSummary.lastCheckIn.id}`}
+                    className="text-[10px] text-[#C9A24D]/60 hover:text-[#C9A24D] transition-colors mt-1.5 inline-block"
+                  >
+                    Review →
+                  </Link>
+                </>
+              ) : (
+                <p className="text-gray-600 text-xs">No recent check-in</p>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* Sensitive health — collapsible client component */}
       <SensitiveHealthPanel {...workspace.sensitive} />

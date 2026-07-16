@@ -1,19 +1,23 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Activity, Calendar, FileText, LayoutDashboard, Target } from "lucide-react";
 
 interface NavItem {
   icon: React.ComponentType<{ size?: number; className?: string }>;
   label: string;
-  active?: boolean;
+  href: string;
+  exact?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { icon: Target,          label: "Today's Mission", active: true },
-  { icon: Activity,        label: "Progress" },
-  { icon: LayoutDashboard, label: "My Program" },
-  { icon: Calendar,        label: "Check-Ins" },
-  { icon: FileText,        label: "Documents" },
+  { icon: Target,          label: "Today's Mission", href: "/portal",       exact: true },
+  { icon: Activity,        label: "Progress",        href: "/portal/progress"            },
+  { icon: LayoutDashboard, label: "My Program",      href: "/portal/program"             },
+  { icon: Calendar,        label: "Check-Ins",       href: "/portal/check-ins"           },
+  { icon: FileText,        label: "Documents",       href: "/portal/documents"           },
 ];
 
 interface Props {
@@ -21,6 +25,13 @@ interface Props {
 }
 
 export default function PortalSidebar({ clientName }: Props) {
+  const pathname = usePathname();
+
+  function isActive(item: NavItem): boolean {
+    if (item.exact) return pathname === item.href;
+    return pathname === item.href || pathname.startsWith(item.href + "/");
+  }
+
   const initials = clientName
     .split(" ")
     .map((w) => w[0])
@@ -46,19 +57,24 @@ export default function PortalSidebar({ clientName }: Props) {
 
       {/* Navigation */}
       <nav className="flex flex-col gap-0.5 px-3 py-4 flex-1">
-        {NAV_ITEMS.map(({ icon: Icon, label, active }) => (
-          <div
-            key={label}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-sm text-xs font-medium tracking-wide transition-colors cursor-default ${
-              active
-                ? "bg-[#c9a24d]/10 text-[#c9a24d]"
-                : "text-white/35 hover:text-white/60 hover:bg-white/[0.04]"
-            }`}
-          >
-            <Icon size={14} className={active ? "text-[#c9a24d]" : "text-white/30"} />
-            {label}
-          </div>
-        ))}
+        {NAV_ITEMS.map((item) => {
+          const active = isActive(item);
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-sm text-xs font-medium tracking-wide transition-colors ${
+                active
+                  ? "bg-[#c9a24d]/10 text-[#c9a24d]"
+                  : "text-white/35 hover:text-white/60 hover:bg-white/[0.04]"
+              }`}
+            >
+              <Icon size={14} className={active ? "text-[#c9a24d]" : "text-white/30"} />
+              {item.label}
+            </Link>
+          );
+        })}
       </nav>
 
       {/* Client identity — links to account page */}

@@ -4,13 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
-import { Menu, X, LayoutDashboard, Users, BookOpen, FileText } from "lucide-react";
+import { Menu, X, LayoutDashboard, Users, BookOpen, FileText, ClipboardCheck } from "lucide-react";
 
 const MAIN_NAV = [
-  { icon: LayoutDashboard, label: "Mission Control", href: "/hq",           exact: true },
-  { icon: Users,           label: "Clients",         href: "/hq/clients"               },
-  { icon: BookOpen,        label: "Programs",        href: "/hq/programs"              },
-  { icon: FileText,        label: "Blueprints",      href: "/hq/blueprints"            },
+  { icon: LayoutDashboard, label: "Mission Control", href: "/hq",            exact: true },
+  { icon: Users,           label: "Clients",         href: "/hq/clients"                },
+  { icon: BookOpen,        label: "Programs",        href: "/hq/programs"               },
+  { icon: FileText,        label: "Blueprints",      href: "/hq/blueprints"             },
+  { icon: ClipboardCheck,  label: "Check-Ins",       href: "/hq/check-ins"              },
 ];
 
 export default function HQMobileNav({ coachName }: { coachName: string }) {
@@ -77,7 +78,7 @@ export default function HQMobileNav({ coachName }: { coachName: string }) {
               <div className="h-px bg-white/[0.05] my-3" />
 
               <div className="px-3 py-2 text-xs text-white/20 space-y-2">
-                {["Check-Ins", "Schedule", "Documents"].map((label) => (
+                {["Schedule", "Documents"].map((label) => (
                   <div key={label} className="flex items-center gap-2">
                     <span>{label}</span>
                     <span className="text-[9px] border border-white/10 px-1 text-white/15">Soon</span>

@@ -20,6 +20,10 @@ import {
   getHistoricalSessionDetail,
   type HistorySession,
 } from "./workout-session-service";
+import {
+  getCheckInMissionStats,
+  type CheckInMissionStats,
+} from "./coach-check-in-service";
 export type { HistoricalSessionDetail, HistoricalSetLog } from "./workout-session-service";
 
 // ─────────────────────────────────────────────────────────────
@@ -75,6 +79,7 @@ export interface MissionControlData {
   recentSkippedCount: number;
   prioritizedClients: CoachClientSummary[]; // non-healthy, sorted by urgency
   recentActivity: RecentSessionActivity[];
+  checkIns: CheckInMissionStats;
 }
 
 export interface CoachClientDetail extends CoachClientSummary {
@@ -320,7 +325,7 @@ export async function getCoachMissionControl(
 ): Promise<MissionControlData> {
   const db = getDb();
 
-  const [clients, recentRows] = await Promise.all([
+  const [clients, recentRows, checkIns] = await Promise.all([
     listCoachClients(_coachId),
     // Recent activity: completed/skipped sessions across all clients
     db
@@ -348,6 +353,7 @@ export async function getCoachMissionControl(
         sql`COALESCE(${workoutSessions.completedAt}, ${workoutSessions.updatedAt}) DESC NULLS LAST`,
       )
       .limit(20),
+    getCheckInMissionStats(),
   ]);
 
   const activeClientCount = clients.filter(
@@ -393,6 +399,7 @@ export async function getCoachMissionControl(
     recentSkippedCount,
     prioritizedClients,
     recentActivity,
+    checkIns,
   };
 }
 
