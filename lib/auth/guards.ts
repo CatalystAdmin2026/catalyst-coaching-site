@@ -64,7 +64,17 @@ async function resolveSession(): Promise<ResolveOk | ResolveFail> {
 
   const db = getDb();
   const rows = await db
-    .select()
+    .select({
+      id: users.id,
+      email: users.email,
+      normalizedEmail: users.normalizedEmail,
+      emailVerifiedAt: users.emailVerifiedAt,
+      role: users.role,
+      status: users.status,
+      createdAt: users.createdAt,
+      updatedAt: users.updatedAt,
+      deletedAt: users.deletedAt,
+    })
     .from(users)
     .where(eq(users.id, authUser.id))
     .limit(1);

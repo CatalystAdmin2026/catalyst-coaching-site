@@ -27,6 +27,18 @@ import { eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
 
+const USER_COLS = {
+  id: users.id,
+  email: users.email,
+  normalizedEmail: users.normalizedEmail,
+  emailVerifiedAt: users.emailVerifiedAt,
+  role: users.role,
+  status: users.status,
+  createdAt: users.createdAt,
+  updatedAt: users.updatedAt,
+  deletedAt: users.deletedAt,
+} as const;
+
 export async function syncUserToPublic(authUser: User): Promise<void> {
   const db = getDb();
 
@@ -68,7 +80,10 @@ export async function syncUserToPublic(authUser: User): Promise<void> {
 // Returns null if no record exists yet (trigger may not have fired yet).
 export async function getPublicUser(userId: string) {
   const db = getDb();
-  return db.query.users.findFirst({
-    where: eq(users.id, userId),
-  });
+  const rows = await db
+    .select(USER_COLS)
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return rows[0] ?? null;
 }
