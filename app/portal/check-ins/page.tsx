@@ -70,6 +70,15 @@ export default async function CheckInsPage() {
     { weekday: "long", month: "short", day: "numeric" },
   );
 
+  // Next check-in window opens the Sunday after the current week ends
+  const nextWeekStart = new Date(window_.weekEndDate + "T12:00:00");
+  nextWeekStart.setDate(nextWeekStart.getDate() + 1);
+  const nextCheckInLabel = nextWeekStart.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+
   return (
     <PortalShell clientName={clientName}>
       <div className="space-y-8">
@@ -143,35 +152,52 @@ export default async function CheckInsPage() {
               </div>
             </div>
           ) : (
-            // Submitted / in_review / reviewed
-            <Link
-              href={`/portal/check-ins/${currentWeekCheckIn.id}`}
-              className="bg-[#0d0e0f] border border-white/[0.06] px-5 py-5 flex items-start justify-between gap-4 hover:border-white/[0.12] transition-colors block"
-            >
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span
-                    className={`text-[9px] border px-1.5 py-0.5 uppercase tracking-[0.2em] ${STATUS_COLOR[currentWeekCheckIn.status]}`}
-                  >
-                    {STATUS_LABEL[currentWeekCheckIn.status]}
-                  </span>
-                  {currentWeekCheckIn.hasCoachResponse && (
-                    <span className="text-[9px] text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 uppercase tracking-[0.2em]">
-                      Response ready
+            // Submitted / in_review / reviewed — check-in is complete for this week
+            <div className="bg-[#0d0e0f] border border-white/[0.06] px-5 py-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-semibold mb-1">
+                    This week&apos;s check-in is complete
+                  </p>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span
+                      className={`text-[9px] border px-1.5 py-0.5 uppercase tracking-[0.2em] ${STATUS_COLOR[currentWeekCheckIn.status]}`}
+                    >
+                      {STATUS_LABEL[currentWeekCheckIn.status]}
                     </span>
+                    {currentWeekCheckIn.hasCoachResponse && (
+                      <span className="text-[9px] text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 uppercase tracking-[0.2em]">
+                        Response ready
+                      </span>
+                    )}
+                  </div>
+                  {currentWeekCheckIn.submittedAt && (
+                    <p className="text-gray-500 text-xs">
+                      Submitted {fmtDate(currentWeekCheckIn.submittedAt)}
+                    </p>
+                  )}
+                  <p className="text-gray-600 text-[10px] mt-0.5">
+                    Next check-in opens {nextCheckInLabel}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  <Link
+                    href={`/portal/check-ins/${currentWeekCheckIn.id}`}
+                    className="text-[10px] text-gray-400 hover:text-white border border-white/[0.08] hover:border-white/[0.18] px-3 py-1.5 uppercase tracking-[0.15em] transition-colors"
+                  >
+                    View →
+                  </Link>
+                  {currentWeekCheckIn.status === "submitted" && (
+                    <Link
+                      href={`/portal/check-ins/${currentWeekCheckIn.id}/edit`}
+                      className="text-[10px] text-[#C9A24D]/70 hover:text-[#C9A24D] border border-[#C9A24D]/20 hover:border-[#C9A24D]/40 px-3 py-1.5 uppercase tracking-[0.15em] transition-colors"
+                    >
+                      Edit
+                    </Link>
                   )}
                 </div>
-                <p className="text-white font-semibold">
-                  Week of {fmtWeek(currentWeekCheckIn.weekStartDate)}
-                </p>
-                {currentWeekCheckIn.submittedAt && (
-                  <p className="text-gray-500 text-xs mt-1">
-                    Submitted {fmtDate(currentWeekCheckIn.submittedAt)}
-                  </p>
-                )}
               </div>
-              <span className="text-gray-600 text-sm shrink-0">→</span>
-            </Link>
+            </div>
           )}
         </section>
 

@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Calendar, FileText, Target } from "lucide-react";
+import { Activity, Calendar, FileText, Layers, Target } from "lucide-react";
 
 const TABS = [
   { icon: Target,   label: "Today",     href: "/portal",           exact: true },
   { icon: Activity, label: "Progress",  href: "/portal/progress"               },
+  { icon: Layers,   label: "Program",   href: "/portal/program"                },
   { icon: Calendar, label: "Check-Ins", href: "/portal/check-ins"              },
   { icon: FileText, label: "Docs",      href: "/portal/documents"              },
 ];

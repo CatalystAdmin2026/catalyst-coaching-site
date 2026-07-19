@@ -16,6 +16,22 @@ import { getClientCheckInDetail } from "@/lib/db/check-in-service";
 export const dynamic = "force-dynamic";
 
 // ─────────────────────────────────────────────────────────────
+// DATE HELPERS
+// ─────────────────────────────────────────────────────────────
+
+function fmtTimestamp(d: Date | null): string {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────
 
@@ -93,13 +109,16 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default async function CheckInDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ checkInId: string }>;
+  searchParams: Promise<{ edited?: string }>;
 }) {
   const { dbUser } = await requireClientUser();
   if (dbUser.role !== "client") redirect("/admin");
 
   const { checkInId } = await params;
+  const { edited } = await searchParams;
 
   const checkIn = await getClientCheckInDetail(dbUser.id, checkInId);
   if (!checkIn) notFound();
@@ -133,14 +152,35 @@ export default async function CheckInDetailPage({
         ← Check-Ins
       </Link>
 
+      {/* Success banner (shown after editing) */}
+      {edited === "1" && (
+        <div className="bg-emerald-500/[0.06] border border-emerald-500/25 px-4 py-3 mb-6">
+          <p className="text-emerald-400 text-sm font-medium">Changes saved</p>
+          <p className="text-emerald-300/60 text-xs mt-0.5">
+            Your check-in has been updated. Your coach will see the latest version.
+          </p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center gap-2 mb-2">
-          <span
-            className={`text-[9px] border px-1.5 py-0.5 uppercase tracking-[0.2em] ${STATUS_COLOR[checkIn.status]}`}
-          >
-            {STATUS_LABEL[checkIn.status]}
-          </span>
+        <div className="flex items-center justify-between gap-4 mb-2">
+          <div className="flex items-center gap-2">
+            <span
+              className={`text-[9px] border px-1.5 py-0.5 uppercase tracking-[0.2em] ${STATUS_COLOR[checkIn.status]}`}
+            >
+              {STATUS_LABEL[checkIn.status]}
+            </span>
+          </div>
+          {/* Edit button — shown only while status is 'submitted' */}
+          {checkIn.status === "submitted" && (
+            <Link
+              href={`/portal/check-ins/${checkInId}/edit`}
+              className="text-[10px] text-[#C9A24D]/70 hover:text-[#C9A24D] border border-[#C9A24D]/20 hover:border-[#C9A24D]/40 px-3 py-1.5 uppercase tracking-[0.15em] transition-colors shrink-0"
+            >
+              Edit
+            </Link>
+          )}
         </div>
         <h1 className="text-white text-xl font-bold tracking-wide">
           Week of {fmtDate(checkIn.weekStartDate)}
@@ -150,6 +190,11 @@ export default async function CheckInDetailPage({
             Submitted {fmtDate(checkIn.submittedAt)}
           </p>
         )}
+        {checkIn.lastEditedAt && (
+          <p className="text-gray-600 text-[10px] mt-0.5">
+            Last edited {fmtTimestamp(checkIn.lastEditedAt)}
+          </p>
+        )}
       </div>
 
       {/* Status message */}
@@ -157,7 +202,14 @@ export default async function CheckInDetailPage({
         <div className="bg-blue-500/[0.05] border border-blue-500/20 px-4 py-3 mb-6">
           <p className="text-blue-400 text-sm font-medium">Waiting for coach review</p>
           <p className="text-blue-300/60 text-xs mt-0.5">
-            Your coach will respond once they review this check-in.
+            Your coach will respond once they review this check-in. You can still{" "}
+            <Link
+              href={`/portal/check-ins/${checkInId}/edit`}
+              className="text-blue-400 underline underline-offset-2 hover:text-blue-300 transition-colors"
+            >
+              edit it
+            </Link>{" "}
+            until then.
           </p>
         </div>
       )}

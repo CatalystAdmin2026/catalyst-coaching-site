@@ -12,7 +12,6 @@ import { getDb } from "./client";
 import {
   programTemplates,
   workoutTemplates,
-  users,
   clientProfiles,
 } from "./schema";
 import {
@@ -85,12 +84,19 @@ export interface TodayWorkout {
   snapshot: WorkoutSnapshot;
 }
 
+export interface NotStartedData {
+  programName: string;
+  startDate: string;
+  daysUntilStart: number;
+  totalWeeks: number | null;
+}
+
 export type TodayResult =
   | { kind: "workout"; data: TodayWorkout }
   | { kind: "rest_day" }
   | { kind: "no_program" }
   | { kind: "program_complete" }
-  | { kind: "not_started" };
+  | { kind: "not_started"; data: NotStartedData };
 
 export interface AssignProgramInput {
   clientId: string;
@@ -241,7 +247,6 @@ export async function listClientPrograms(
       programTemplates,
       eq(clientPrograms.programTemplateId, programTemplates.id),
     )
-    .innerJoin(users, eq(clientPrograms.clientId, users.id))
     .where(eq(clientPrograms.clientId, clientId))
     .orderBy(desc(clientPrograms.createdAt));
 
@@ -417,16 +422,7 @@ export async function getTodayWorkout(
   const assignment = await getClientActiveProgram(clientId);
   if (!assignment) return { kind: "no_program" };
 
-  const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
-  const elapsed = daysBetween(assignment.startDate, today);
-
-  if (elapsed < 0) return { kind: "not_started" };
-
-  const weekNumber = Math.floor(elapsed / 7) + 1;
-  const dayOfWeek = today.getDay();
-
-  // Fetch program template for total week count
+  // Fetch template early — needed for not_started data and program_complete check.
   const [tmpl] = await db
     .select({
       name: programTemplates.name,
@@ -437,6 +433,25 @@ export async function getTodayWorkout(
     .limit(1);
 
   if (!tmpl) return { kind: "no_program" };
+
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const elapsed = daysBetween(assignment.startDate, today);
+
+  if (elapsed < 0) {
+    return {
+      kind: "not_started",
+      data: {
+        programName: tmpl.name,
+        startDate: assignment.startDate,
+        daysUntilStart: Math.abs(elapsed),
+        totalWeeks: tmpl.totalWeeks,
+      },
+    };
+  }
+
+  const weekNumber = Math.floor(elapsed / 7) + 1;
+  const dayOfWeek = today.getDay();
 
   if (tmpl.totalWeeks !== null && weekNumber > tmpl.totalWeeks) {
     return { kind: "program_complete" };

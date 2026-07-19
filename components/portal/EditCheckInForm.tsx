@@ -1,26 +1,22 @@
 "use client";
 
 // ─────────────────────────────────────────────────────────────
-// Catalyst Portal — Weekly Check-In Form
+// Catalyst Portal — Edit Submitted Check-In Form
 //
-// Client Component. Manages local state for all 4 sections:
-//   1. Body (weight, waist)
-//   2. Recovery (sleep, stress, energy, hunger, digestion)
-//   3. Habits (water, steps, workout compliance, nutrition compliance)
-//   4. Reflection (wins, challenges, questions, notes)
+// Client Component. Allows a client to correct a submitted
+// check-in while its status is still 'submitted'.
 //
-// Auto-saves draft to the DB on every field change (debounced 800ms).
-// Client-side validation runs before every save and before submit —
-// invalid fields show inline error messages and skip the DB call.
-// Submit is an explicit action after all desired fields are filled.
+// Unlike CheckInForm:
+//   - No auto-save. Changes commit only on explicit "Save".
+//   - Calls editSubmittedCheckInAction (not saveDraftCheckInAction).
+//   - On success, redirects to the detail view with ?edited=1.
+//   - Shows a race-condition error if the coach starts reviewing
+//     while the client has the form open.
 // ─────────────────────────────────────────────────────────────
 
-import { useState, useCallback, useRef, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  saveDraftCheckInAction,
-  submitCheckInAction,
-} from "@/app/portal/check-ins/actions";
+import { editSubmittedCheckInAction } from "@/app/portal/check-ins/actions";
 import type { CheckInDraftData } from "@/lib/db/check-in-service";
 import {
   validateCheckInDraft,
@@ -32,7 +28,7 @@ import {
 // TYPES
 // ─────────────────────────────────────────────────────────────
 
-interface FormState {
+export interface EditFormInitialData {
   bodyWeightLbs: string;
   waistInches: string;
   averageSleepHours: string;
@@ -51,13 +47,15 @@ interface FormState {
 }
 
 interface Props {
-  initialData?: Partial<FormState>;
-  existingCheckInId?: string;
+  checkInId: string;
+  initialData: EditFormInitialData;
   weekStartDate: string;
+  submittedAt: Date | null;
 }
 
 // ─────────────────────────────────────────────────────────────
-// SHARED FIELD COMPONENTS
+// SHARED FIELD COMPONENTS (duplicated from CheckInForm to keep
+// the two forms independently evolvable without a shared import)
 // ─────────────────────────────────────────────────────────────
 
 function FieldLabel({
@@ -132,8 +130,7 @@ function RatingSlider({
   highLabel?: string;
 }) {
   const display = value !== null ? String(value) : "—";
-  const fillPct =
-    value !== null ? ((value - min) / (max - min)) * 100 : 0;
+  const fillPct = value !== null ? ((value - min) / (max - min)) * 100 : 0;
 
   return (
     <div>
@@ -187,7 +184,6 @@ function RatingSlider({
           </button>
         )}
       </div>
-      {/* Tap-to-set grid for mobile friendliness */}
       <div className="grid grid-cols-10 gap-1 mt-2">
         {Array.from({ length: max - min + 1 }, (_, i) => i + min).map((n) => (
           <button
@@ -317,28 +313,10 @@ function SectionHeader({ number, title, subtitle }: { number: number; title: str
 }
 
 // ─────────────────────────────────────────────────────────────
-// MAIN FORM
+// HELPERS
 // ─────────────────────────────────────────────────────────────
 
-const EMPTY_STATE: FormState = {
-  bodyWeightLbs: "",
-  waistInches: "",
-  averageSleepHours: "",
-  averageStress: null,
-  averageEnergy: null,
-  averageHunger: null,
-  digestionRating: null,
-  averageWaterOunces: "",
-  averageSteps: "",
-  workoutCompliancePct: null,
-  nutritionCompliancePct: null,
-  wins: "",
-  challenges: "",
-  questions: "",
-  clientNotes: "",
-};
-
-function formToServiceData(f: FormState): CheckInDraftData {
+function formToServiceData(f: EditFormInitialData): CheckInDraftData {
   return {
     bodyWeightLbs: f.bodyWeightLbs || null,
     waistInches: f.waistInches || null,
@@ -358,128 +336,62 @@ function formToServiceData(f: FormState): CheckInDraftData {
   };
 }
 
-export default function CheckInForm({ initialData, existingCheckInId, weekStartDate }: Props) {
+// ─────────────────────────────────────────────────────────────
+// FORM
+// ─────────────────────────────────────────────────────────────
+
+export default function EditCheckInForm({
+  checkInId,
+  initialData,
+  weekStartDate,
+  submittedAt,
+}: Props) {
   const router = useRouter();
-  const [form, setFormState] = useState<FormState>({
-    ...EMPTY_STATE,
-    ...initialData,
-  });
-
-  const [savedAt, setSavedAt] = useState<Date | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [form, setFormState] = useState<EditFormInitialData>(initialData);
   const [fieldErrors, setFieldErrors] = useState<CheckInFieldErrors>({});
-  const [checkInId, setCheckInId] = useState<string | undefined>(existingCheckInId);
-  const [isPendingSave, startSaveTx] = useTransition();
-  const [isPendingSubmit, startSubmitTx] = useTransition();
-  const [submitted, setSubmitted] = useState(false);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [generalError, setGeneralError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
-  const scheduleDraftSave = useCallback(
-    (nextForm: FormState) => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => {
-        const serviceData = formToServiceData(nextForm);
+  const setField = <K extends keyof EditFormInitialData>(
+    key: K,
+    value: EditFormInitialData[K],
+  ) => {
+    setFormState((prev) => ({ ...prev, [key]: value }));
+  };
 
-        // Client-side validation — same rules as server; avoids a round-trip
-        // for values that will definitely fail the DB CHECK constraints.
-        const errors = validateCheckInDraft(serviceData);
-        if (hasFieldErrors(errors)) {
-          setFieldErrors(errors);
-          setSavedAt(null);
-          setSaveError(null);
-          return;
-        }
-
-        setFieldErrors({});
-        startSaveTx(async () => {
-          const result = await saveDraftCheckInAction(serviceData);
-          if (result.ok) {
-            setCheckInId(result.checkInId);
-            setSavedAt(new Date());
-            setSaveError(null);
-            setFieldErrors({});
-          } else if (result.fieldErrors) {
-            setFieldErrors(result.fieldErrors);
-            setSaveError(null);
-          } else {
-            setSaveError(result.error ?? "Failed to save draft.");
-          }
-        });
-      }, 800);
-    },
-    [],
-  );
-
-  const setField = useCallback(
-    <K extends keyof FormState>(key: K, value: FormState[K]) => {
-      setFormState((prev) => {
-        const next = { ...prev, [key]: value };
-        scheduleDraftSave(next);
-        return next;
-      });
-    },
-    [scheduleDraftSave],
-  );
-
-  const handleSubmit = () => {
-    // Client-side validation before submit — show all errors at once.
+  const handleSave = () => {
     const serviceData = formToServiceData(form);
     const errors = validateCheckInDraft(serviceData);
     if (hasFieldErrors(errors)) {
       setFieldErrors(errors);
-      setSaveError("Please fix the errors below before submitting.");
+      setGeneralError("Please fix the errors below before saving.");
       return;
     }
 
-    if (!checkInId) {
-      startSubmitTx(async () => {
-        const saveResult = await saveDraftCheckInAction(serviceData);
-        if (!saveResult.ok) {
-          if (saveResult.fieldErrors) {
-            setFieldErrors(saveResult.fieldErrors);
-            setSaveError(null);
-          } else {
-            setSaveError(saveResult.error ?? "Failed to save draft.");
-          }
-          return;
-        }
-        const id = saveResult.checkInId!;
-        setCheckInId(id);
-        const submitResult = await submitCheckInAction(id);
-        if (submitResult.ok) {
-          setSubmitted(true);
-          router.push("/portal/check-ins");
-        } else {
-          setSaveError(submitResult.error ?? "Failed to submit check-in.");
-        }
-      });
-    } else {
-      startSubmitTx(async () => {
-        // Flush any pending draft save first.
-        if (saveTimerRef.current) {
-          clearTimeout(saveTimerRef.current);
-          saveTimerRef.current = null;
-          const flushResult = await saveDraftCheckInAction(serviceData);
-          if (!flushResult.ok) {
-            if (flushResult.fieldErrors) {
-              setFieldErrors(flushResult.fieldErrors);
-              setSaveError(null);
-            } else {
-              setSaveError(flushResult.error ?? "Failed to save draft.");
-            }
-            return;
-          }
-        }
-        const result = await submitCheckInAction(checkInId);
-        if (result.ok) {
-          setSubmitted(true);
-          router.push("/portal/check-ins");
-        } else {
-          setSaveError(result.error ?? "Failed to submit check-in.");
-        }
-      });
-    }
+    setFieldErrors({});
+    setGeneralError(null);
+
+    startTransition(async () => {
+      const result = await editSubmittedCheckInAction(checkInId, serviceData);
+      if (result.ok) {
+        router.push(`/portal/check-ins/${checkInId}?edited=1`);
+      } else if (result.fieldErrors) {
+        setFieldErrors(result.fieldErrors);
+        setGeneralError(null);
+      } else {
+        setGeneralError(result.error ?? "Failed to save changes.");
+      }
+    });
   };
+
+  const submittedLabel = submittedAt
+    ? new Date(submittedAt).toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
+    : null;
 
   const weekLabel = new Date(weekStartDate + "T12:00:00").toLocaleDateString("en-US", {
     month: "long",
@@ -487,27 +399,25 @@ export default function CheckInForm({ initialData, existingCheckInId, weekStartD
     year: "numeric",
   });
 
-  if (submitted) {
-    return (
-      <div className="text-center py-12">
-        <div className="w-10 h-10 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto mb-4">
-          <span className="text-emerald-400 text-lg">✓</span>
-        </div>
-        <p className="text-white font-semibold">Check-in submitted</p>
-        <p className="text-gray-500 text-sm mt-1">Your coach will respond soon.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-10">
+      {/* Notice banner */}
+      <div className="bg-blue-500/[0.05] border border-blue-500/20 px-4 py-3">
+        <p className="text-blue-400 text-sm font-medium">Editing a submitted check-in</p>
+        {submittedLabel && (
+          <p className="text-blue-300/60 text-xs mt-0.5">
+            Originally submitted {submittedLabel}. Your original submission date is preserved.
+          </p>
+        )}
+      </div>
+
       {/* Week header */}
       <div className="border-b border-white/[0.06] pb-4">
         <p className="text-[9px] text-gray-500 uppercase tracking-[0.4em]">
           Week of {weekLabel}
         </p>
         <p className="text-gray-400 text-xs mt-1">
-          Fill in what you tracked. Leave anything blank that you didn&apos;t log.
+          Correct any values below, then click Save Changes.
         </p>
       </div>
 
@@ -687,42 +597,31 @@ export default function CheckInForm({ initialData, existingCheckInId, weekStartD
         </div>
       </section>
 
-      {/* Save status */}
-      <div className="text-[10px] text-gray-600 min-h-[16px]">
-        {isPendingSave && <span>Saving…</span>}
-        {!isPendingSave && savedAt && !hasFieldErrors(fieldErrors) && (
-          <span>
-            Draft saved at{" "}
-            {savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-          </span>
-        )}
-        {saveError && (
-          <span className="text-red-400">{saveError}</span>
-        )}
-      </div>
+      {/* General error (race condition or server error) */}
+      {generalError && (
+        <div className="bg-red-500/[0.06] border border-red-500/20 px-4 py-3">
+          <p className="text-red-400 text-sm">{generalError}</p>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t border-white/[0.06]">
         <button
           type="button"
-          onClick={handleSubmit}
-          disabled={isPendingSubmit || isPendingSave}
+          onClick={handleSave}
+          disabled={isPending}
           className="flex-1 bg-[#C9A24D] text-black text-sm font-bold uppercase tracking-[0.2em] px-6 py-3 hover:bg-[#d4af63] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {isPendingSubmit ? "Submitting…" : "Submit Check-In"}
+          {isPending ? "Saving…" : "Save Changes"}
         </button>
         <button
           type="button"
-          onClick={() => router.push("/portal/check-ins")}
+          onClick={() => router.push(`/portal/check-ins/${checkInId}`)}
           className="sm:w-auto text-gray-500 text-sm hover:text-gray-300 transition-colors border border-white/[0.08] px-5 py-3"
         >
-          Save &amp; Exit
+          Cancel
         </button>
       </div>
-
-      <p className="text-[10px] text-gray-600 pb-4">
-        Your draft is automatically saved as you type. You can come back and finish later.
-      </p>
     </div>
   );
 }

@@ -10,6 +10,10 @@
  */
 
 import { readFile } from "fs/promises";
+import {
+  validateCheckInDraft,
+  hasFieldErrors,
+} from "../lib/db/check-in-validation";
 
 let passed = 0;
 let failed = 0;
@@ -405,6 +409,118 @@ async function main() {
     assert("Workspace page imports getClientCheckInSummary", workspacePage.includes("getClientCheckInSummary"));
     assert("Workspace page fetches check-in summary in parallel", workspacePage.includes("getClientCheckInSummary(clientId)"));
     assert("Workspace page renders check-in panel", workspacePage.includes("Check-Ins"));
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // VALIDATION HARDENING CONTRACT
+  //
+  // Exercises validateCheckInDraft() directly (pure function,
+  // no server-only deps) and verifies the form + action wiring.
+  // ─────────────────────────────────────────────────────────────
+
+  section("Validation hardening — pure function tests");
+
+  // waist = 0 must be rejected (DB: waist_inches > 0)
+  {
+    const e = validateCheckInDraft({ waistInches: "0" });
+    assert("waistInches=0 produces a validation error", hasFieldErrors(e));
+    assert("waistInches=0 error is on the waistInches field", !!e.waistInches);
+  }
+
+  // weight = 0 must be rejected (DB: body_weight_lbs > 0)
+  {
+    const e = validateCheckInDraft({ bodyWeightLbs: "0" });
+    assert("bodyWeightLbs=0 produces a validation error", hasFieldErrors(e));
+    assert("bodyWeightLbs=0 error is on the bodyWeightLbs field", !!e.bodyWeightLbs);
+  }
+
+  // Negative values must be rejected
+  {
+    const e1 = validateCheckInDraft({ waistInches: "-5" });
+    assert("waistInches=-5 produces a validation error", !!e1.waistInches);
+
+    const e2 = validateCheckInDraft({ bodyWeightLbs: "-1" });
+    assert("bodyWeightLbs=-1 produces a validation error", !!e2.bodyWeightLbs);
+
+    const e3 = validateCheckInDraft({ averageSleepHours: "-0.5" });
+    assert("averageSleepHours=-0.5 produces a validation error", !!e3.averageSleepHours);
+  }
+
+  // Sleep > 24 must be rejected (physical cap)
+  {
+    const e = validateCheckInDraft({ averageSleepHours: "25" });
+    assert("averageSleepHours=25 produces a validation error (>24 cap)", !!e.averageSleepHours);
+  }
+
+  // Negative water / steps must be rejected
+  {
+    const e1 = validateCheckInDraft({ averageWaterOunces: -1 });
+    assert("averageWaterOunces=-1 produces a validation error", !!e1.averageWaterOunces);
+
+    const e2 = validateCheckInDraft({ averageSteps: -100 });
+    assert("averageSteps=-100 produces a validation error", !!e2.averageSteps);
+  }
+
+  // Valid values must pass
+  {
+    const e1 = validateCheckInDraft({ waistInches: "34.0" });
+    assert("waistInches=34.0 passes validation", !hasFieldErrors(e1));
+
+    const e2 = validateCheckInDraft({ bodyWeightLbs: "185.5" });
+    assert("bodyWeightLbs=185.5 passes validation", !hasFieldErrors(e2));
+
+    const e3 = validateCheckInDraft({ averageSleepHours: "7.5" });
+    assert("averageSleepHours=7.5 passes validation", !hasFieldErrors(e3));
+  }
+
+  // All-null data (all fields optional) must pass
+  {
+    const e = validateCheckInDraft({
+      bodyWeightLbs: null,
+      waistInches: null,
+      averageSleepHours: null,
+      averageStress: null,
+      averageEnergy: null,
+      averageHunger: null,
+      digestionRating: null,
+      averageWaterOunces: null,
+      averageSteps: null,
+      workoutCompliancePct: null,
+      nutritionCompliancePct: null,
+    });
+    assert("All-null data passes validation (all fields optional)", !hasFieldErrors(e));
+  }
+
+  section("Validation hardening — file wiring");
+
+  {
+    const validation = await readSrc("./lib/db/check-in-validation.ts");
+    assert("Validation module exports validateCheckInDraft", validation.includes("export function validateCheckInDraft"));
+    assert("Validation module exports hasFieldErrors", validation.includes("export function hasFieldErrors"));
+    assert("Validation module exports CheckInFieldErrors interface", validation.includes("export interface CheckInFieldErrors"));
+    assert("Validation module rejects bodyWeightLbs <= 0", validation.includes("n <= 0") && validation.includes("bodyWeightLbs"));
+    assert("Validation module rejects waistInches <= 0", validation.includes("n <= 0") && validation.includes("waistInches"));
+    assert("Validation module enforces 24h sleep cap", validation.includes("24"));
+  }
+
+  {
+    const action = await readSrc("./app/portal/check-ins/actions.ts");
+    assert("Portal action imports validateCheckInDraft", action.includes("validateCheckInDraft"));
+    assert("Portal action imports hasFieldErrors", action.includes("hasFieldErrors"));
+    assert("Portal action returns fieldErrors on validation failure", action.includes("fieldErrors"));
+    assert("Portal action wraps service call in try/catch", action.includes("try {") && action.includes("} catch"));
+  }
+
+  {
+    const form = await readSrc("./components/portal/CheckInForm.tsx");
+    assert("Form imports validateCheckInDraft", form.includes("validateCheckInDraft"));
+    assert("Form imports hasFieldErrors", form.includes("hasFieldErrors"));
+    assert("Form has fieldErrors state", form.includes("fieldErrors"));
+    assert("Form has FieldError component", form.includes("FieldError"));
+    assert("Weight input min is 0.1 (DB: > 0)", form.includes('min="0.1"'));
+    assert("Waist input min is 0.25 (DB: > 0)", form.includes('min="0.25"'));
+    assert("Sleep input max is 24 (physical cap)", form.includes('max="24"'));
+    assert("Form validates before submit", form.includes("validateCheckInDraft") && form.includes("handleSubmit"));
   }
 
   // ─────────────────────────────────────────────────────────────

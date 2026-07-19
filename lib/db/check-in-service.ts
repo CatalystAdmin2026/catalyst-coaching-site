@@ -24,6 +24,11 @@ import { eq, and, desc } from "drizzle-orm";
 import { getDb } from "./client";
 import { users, coachingEnrollments, timelineEvents } from "./schema";
 import { weeklyCheckIns, type WeeklyCheckInStatus } from "./schema-check-in";
+import {
+  validateCheckInDraft,
+  hasFieldErrors,
+  type CheckInFieldErrors,
+} from "./check-in-validation";
 
 // ─────────────────────────────────────────────────────────────
 // WEEK DATE HELPERS
@@ -126,6 +131,9 @@ export interface CheckInDetail {
   clientNotes: string | null;
   // Coach response — only visible if status is 'reviewed'
   coachResponse: string | null;
+  // Set when client edits the record after it was submitted.
+  // Null means no post-submission edit has occurred.
+  lastEditedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -418,7 +426,33 @@ export async function getClientCheckInDetail(
   const db = getDb();
 
   const [row] = await db
-    .select()
+    .select({
+      id: weeklyCheckIns.id,
+      clientId: weeklyCheckIns.clientId,
+      weekStartDate: weeklyCheckIns.weekStartDate,
+      status: weeklyCheckIns.status,
+      submittedAt: weeklyCheckIns.submittedAt,
+      coachReviewedAt: weeklyCheckIns.coachReviewedAt,
+      bodyWeightLbs: weeklyCheckIns.bodyWeightLbs,
+      waistInches: weeklyCheckIns.waistInches,
+      averageSleepHours: weeklyCheckIns.averageSleepHours,
+      averageStress: weeklyCheckIns.averageStress,
+      averageEnergy: weeklyCheckIns.averageEnergy,
+      averageHunger: weeklyCheckIns.averageHunger,
+      digestionRating: weeklyCheckIns.digestionRating,
+      averageWaterOunces: weeklyCheckIns.averageWaterOunces,
+      averageSteps: weeklyCheckIns.averageSteps,
+      workoutCompliancePct: weeklyCheckIns.workoutCompliancePct,
+      nutritionCompliancePct: weeklyCheckIns.nutritionCompliancePct,
+      wins: weeklyCheckIns.wins,
+      challenges: weeklyCheckIns.challenges,
+      questions: weeklyCheckIns.questions,
+      clientNotes: weeklyCheckIns.clientNotes,
+      coachResponse: weeklyCheckIns.coachResponse,
+      lastEditedAt: weeklyCheckIns.lastEditedAt,
+      createdAt: weeklyCheckIns.createdAt,
+      updatedAt: weeklyCheckIns.updatedAt,
+    })
     .from(weeklyCheckIns)
     .where(
       and(
@@ -454,6 +488,7 @@ export async function getClientCheckInDetail(
     clientNotes: row.clientNotes,
     // Only expose coach response after review is complete
     coachResponse: row.status === "reviewed" ? row.coachResponse : null,
+    lastEditedAt: row.lastEditedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -473,7 +508,33 @@ export async function getPreviousCheckIn(
   const db = getDb();
 
   const [row] = await db
-    .select()
+    .select({
+      id: weeklyCheckIns.id,
+      clientId: weeklyCheckIns.clientId,
+      weekStartDate: weeklyCheckIns.weekStartDate,
+      status: weeklyCheckIns.status,
+      submittedAt: weeklyCheckIns.submittedAt,
+      coachReviewedAt: weeklyCheckIns.coachReviewedAt,
+      bodyWeightLbs: weeklyCheckIns.bodyWeightLbs,
+      waistInches: weeklyCheckIns.waistInches,
+      averageSleepHours: weeklyCheckIns.averageSleepHours,
+      averageStress: weeklyCheckIns.averageStress,
+      averageEnergy: weeklyCheckIns.averageEnergy,
+      averageHunger: weeklyCheckIns.averageHunger,
+      digestionRating: weeklyCheckIns.digestionRating,
+      averageWaterOunces: weeklyCheckIns.averageWaterOunces,
+      averageSteps: weeklyCheckIns.averageSteps,
+      workoutCompliancePct: weeklyCheckIns.workoutCompliancePct,
+      nutritionCompliancePct: weeklyCheckIns.nutritionCompliancePct,
+      wins: weeklyCheckIns.wins,
+      challenges: weeklyCheckIns.challenges,
+      questions: weeklyCheckIns.questions,
+      clientNotes: weeklyCheckIns.clientNotes,
+      coachResponse: weeklyCheckIns.coachResponse,
+      lastEditedAt: weeklyCheckIns.lastEditedAt,
+      createdAt: weeklyCheckIns.createdAt,
+      updatedAt: weeklyCheckIns.updatedAt,
+    })
     .from(weeklyCheckIns)
     .where(
       and(
@@ -510,7 +571,96 @@ export async function getPreviousCheckIn(
     questions: row.questions,
     clientNotes: row.clientNotes,
     coachResponse: row.coachResponse,
+    lastEditedAt: row.lastEditedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// EDIT SUBMITTED CHECK-IN
+//
+// Allows a client to correct a submitted check-in while status
+// is still 'submitted'. Uses an atomic conditional UPDATE to
+// detect coach race conditions at the database level.
+//
+// Returns:
+//   { ok: true } — saved successfully
+//   { ok: false, fieldErrors } — validation failed
+//   { ok: false, error: "race" message } — coach started reviewing
+//   { ok: false, error: "not found" } — ownership mismatch or not found
+// ─────────────────────────────────────────────────────────────
+
+export async function editSubmittedCheckIn(
+  clientId: string,
+  checkInId: string,
+  data: CheckInDraftData,
+): Promise<{
+  ok: boolean;
+  error?: string;
+  fieldErrors?: CheckInFieldErrors;
+}> {
+  // Validate first — no DB round-trip needed if data is malformed.
+  const fieldErrors = validateCheckInDraft(data);
+  if (hasFieldErrors(fieldErrors)) {
+    return { ok: false, fieldErrors };
+  }
+
+  const db = getDb();
+  const now = new Date();
+
+  // Atomic conditional update: only succeeds if the row still belongs
+  // to this client AND status is still 'submitted'. If the coach has
+  // already transitioned to in_review, the WHERE predicate matches zero
+  // rows and .returning() yields an empty array.
+  const updated = await db
+    .update(weeklyCheckIns)
+    .set({
+      bodyWeightLbs: data.bodyWeightLbs ?? null,
+      waistInches: data.waistInches ?? null,
+      averageSleepHours: data.averageSleepHours ?? null,
+      averageStress: data.averageStress ?? null,
+      averageEnergy: data.averageEnergy ?? null,
+      averageHunger: data.averageHunger ?? null,
+      digestionRating: data.digestionRating ?? null,
+      averageWaterOunces: data.averageWaterOunces ?? null,
+      averageSteps: data.averageSteps ?? null,
+      workoutCompliancePct: data.workoutCompliancePct ?? null,
+      nutritionCompliancePct: data.nutritionCompliancePct ?? null,
+      wins: data.wins ?? null,
+      challenges: data.challenges ?? null,
+      questions: data.questions ?? null,
+      clientNotes: data.clientNotes ?? null,
+      lastEditedAt: now,
+      updatedAt: now,
+      // submittedAt is intentionally NOT touched — original timestamp preserved.
+    })
+    .where(
+      and(
+        eq(weeklyCheckIns.id, checkInId),
+        eq(weeklyCheckIns.clientId, clientId),
+        eq(weeklyCheckIns.status, "submitted"),
+      ),
+    )
+    .returning({ id: weeklyCheckIns.id });
+
+  if (updated[0]) return { ok: true };
+
+  // No row matched — distinguish ownership failure from race condition.
+  const [existing] = await db
+    .select({ id: weeklyCheckIns.id, clientId: weeklyCheckIns.clientId, status: weeklyCheckIns.status })
+    .from(weeklyCheckIns)
+    .where(eq(weeklyCheckIns.id, checkInId))
+    .limit(1);
+
+  if (!existing || existing.clientId !== clientId) {
+    return { ok: false, error: "Check-in not found." };
+  }
+
+  // The record exists and belongs to this client but status has changed.
+  return {
+    ok: false,
+    error:
+      "Your coach has already started reviewing this check-in, so it can no longer be edited.",
   };
 }

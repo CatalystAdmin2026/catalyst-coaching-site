@@ -359,6 +359,17 @@ export default async function CheckInReviewPage({
                 Submitted {fmtDate(checkIn.submittedAt, true)}
               </span>
             )}
+            {checkIn.lastEditedAt && (
+              <>
+                <span className="text-gray-700 text-[10px]">·</span>
+                <span className="text-[10px] text-amber-400/80">
+                  Edited after submission
+                </span>
+                <span className="text-[10px] text-gray-600">
+                  ({fmtDate(checkIn.lastEditedAt, true)})
+                </span>
+              </>
+            )}
             <Link
               href={`/hq/clients/${checkIn.clientId}`}
               className="text-[10px] text-[#C9A24D]/60 hover:text-[#C9A24D] transition-colors uppercase tracking-[0.15em]"

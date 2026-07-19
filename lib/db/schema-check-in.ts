@@ -112,6 +112,11 @@ export const weeklyCheckIns = pgTable(
       onDelete: "set null",
     }),
 
+    // Set only when the client edits the record after it was submitted.
+    // Null means it was never edited post-submission. Coach draft saves
+    // do NOT update this field, keeping client-edit provenance clean.
+    lastEditedAt: timestamp("last_edited_at", { withTimezone: true }),
+
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

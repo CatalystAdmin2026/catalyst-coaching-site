@@ -33,40 +33,47 @@ type TodayResult =
 type View = "today" | "active_session" | "completed";
 
 // ─────────────────────────────────────────────────────────────
-// EMPTY STATE
+// EMPTY STATES
 // ─────────────────────────────────────────────────────────────
 
 function EmptyState({ kind }: { kind: string }) {
   const messages: Record<string, { title: string; body: string }> = {
     rest_day: {
       title: "Rest Day",
-      body: "Active recovery — prioritize sleep, mobility, and nutrition today.",
+      body: "Active recovery — protect your sleep, hit your protein targets, and move lightly. The adaptation happens now.",
     },
     no_program: {
       title: "No Program Assigned",
-      body: "Your coach will assign your training program once your onboarding is complete.",
+      body: "Your coach will assign your training program once your onboarding is complete. Use this time to build your foundation habits.",
     },
     program_complete: {
       title: "Program Complete",
-      body: "You've completed this training program. Your coach will assign your next block soon.",
+      body: "Every session logged, every promise kept. Your coach will assign your next training block soon.",
     },
     not_started: {
       title: "Program Starts Soon",
-      body: "Your training program hasn't started yet. Check back on your start date.",
+      body: "Your training block hasn't started yet. Prepare your environment, dial in sleep and nutrition, and show up ready.",
     },
   };
 
   const msg = messages[kind] ?? messages.no_program;
 
+  const icon =
+    kind === "rest_day" ? "○" :
+    kind === "program_complete" ? "✓" :
+    kind === "not_started" ? "◷" : "·";
+
   return (
-    <div className="border border-white/[0.06] bg-[#0d0e0f] p-6 text-center">
-      <div className="w-8 h-8 border border-white/[0.1] rounded-full flex items-center justify-center mx-auto mb-3">
-        <span className="text-gray-400 text-sm">
-          {kind === "rest_day" ? "○" : kind === "program_complete" ? "✓" : "·"}
-        </span>
+    <div className="border border-white/[0.07] bg-[#0d0e0f] px-6 py-7">
+      <div className="flex items-start gap-4">
+        <div className="w-8 h-8 border border-white/[0.12] flex items-center justify-center shrink-0 mt-0.5">
+          <span className="text-gray-400 text-sm">{icon}</span>
+        </div>
+        <div>
+          <p className="text-white text-sm font-semibold mb-1">{msg.title}</p>
+          <p className="text-gray-400 text-xs leading-relaxed">{msg.body}</p>
+        </div>
       </div>
-      <p className="text-white text-sm font-semibold mb-1">{msg.title}</p>
-      <p className="text-gray-400 text-xs leading-relaxed">{msg.body}</p>
     </div>
   );
 }
@@ -120,71 +127,88 @@ function WorkoutCard({
   }
 
   return (
-    <div className="border border-white/[0.06] bg-[#0d0e0f]">
+    <div className="border border-white/[0.08] bg-[#0d0e0f] relative overflow-hidden">
+      {/* Subtle top accent on the primary card */}
+      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-[#c9a24d]/20 to-transparent" aria-hidden />
+
       {/* Header */}
       <div className="px-5 pt-5 pb-4 border-b border-white/[0.04]">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[9px] text-gray-400 uppercase tracking-[0.5em] mb-1">
-              {data.programName} · Week {data.weekNumber} of {data.totalWeeks}
+            <p className="text-[9px] text-gray-500 uppercase tracking-[0.4em] mb-1">
+              {data.programName} · Week {data.weekNumber}/{data.totalWeeks}
             </p>
-            <h3 className="text-white text-lg font-bold tracking-wide">{data.workoutName}</h3>
+            <h3 className="text-white text-lg font-bold tracking-wide leading-snug">
+              {data.workoutName}
+            </h3>
           </div>
           {data.estimatedDurationMinutes && (
             <div className="shrink-0 text-right">
-              <p className="text-[#C9A24D] text-lg font-bold">{data.estimatedDurationMinutes}</p>
-              <p className="text-gray-400 text-[9px] uppercase tracking-[0.3em]">min</p>
+              <p className="text-[#C9A24D] text-xl font-bold tabular-nums leading-none">
+                {data.estimatedDurationMinutes}
+              </p>
+              <p className="text-gray-500 text-[9px] uppercase tracking-[0.3em] mt-0.5">min</p>
             </div>
           )}
         </div>
 
-        <div className="flex items-center gap-4 mt-3 text-gray-400 text-[11px]">
+        <div className="flex items-center gap-3 mt-2.5 text-gray-500 text-[10px]">
           <span>{totalExercises} exercise{totalExercises !== 1 ? "s" : ""}</span>
           <span>·</span>
-          <span>{totalSets} total sets</span>
+          <span>{totalSets} sets</span>
           {data.snapshot.sections.length > 0 && (
             <>
               <span>·</span>
-              <span>{data.snapshot.sections.length} sections</span>
+              <span>{data.snapshot.sections.length} blocks</span>
             </>
           )}
         </div>
       </div>
 
-      {/* Section preview */}
-      <div className="px-5 py-3 border-b border-white/[0.04]">
-        <div className="space-y-1.5">
-          {data.snapshot.sections.slice(0, 4).map((sec) => (
-            <div key={sec.id} className="flex items-center gap-3">
-              <span className="text-gray-500 text-[9px] uppercase tracking-[0.3em] w-20 shrink-0">
-                {sec.name}
-              </span>
-              <span className="text-gray-400 text-[10px]">
-                {sec.exercises.map((e) => e.exerciseName).join(", ")}
-              </span>
-            </div>
-          ))}
-          {data.snapshot.sections.length > 4 && (
-            <p className="text-gray-500 text-[10px]">
-              +{data.snapshot.sections.length - 4} more sections
-            </p>
-          )}
-        </div>
+      {/* Exercise preview */}
+      <div className="px-5 py-3 border-b border-white/[0.04] space-y-1.5">
+        {data.snapshot.sections.slice(0, 4).map((sec) => (
+          <div key={sec.id} className="flex items-start gap-3">
+            <span className="text-gray-600 text-[9px] uppercase tracking-[0.3em] w-20 shrink-0 pt-px">
+              {sec.name}
+            </span>
+            <span className="text-gray-400 text-[10px] leading-relaxed">
+              {sec.exercises.map((e) => e.exerciseName).join(", ")}
+            </span>
+          </div>
+        ))}
+        {data.snapshot.unsectioned.length > 0 && data.snapshot.sections.length === 0 && (
+          <div className="flex items-start gap-3">
+            <span className="text-gray-600 text-[9px] uppercase tracking-[0.3em] w-20 shrink-0 pt-px">
+              Exercises
+            </span>
+            <span className="text-gray-400 text-[10px] leading-relaxed">
+              {data.snapshot.unsectioned.map((e) => e.exerciseName).join(", ")}
+            </span>
+          </div>
+        )}
+        {data.snapshot.sections.length > 4 && (
+          <p className="text-gray-600 text-[10px]">
+            +{data.snapshot.sections.length - 4} more blocks
+          </p>
+        )}
       </div>
 
       {/* Action */}
       <div className="px-5 py-4">
         {isCompleted ? (
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-5 h-5 border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-center shrink-0">
               <span className="text-emerald-400 text-[9px]">✓</span>
             </div>
-            <span className="text-emerald-400 text-xs font-semibold">Workout completed today</span>
+            <span className="text-emerald-400 text-xs font-semibold tracking-wide">
+              Promise kept — session logged
+            </span>
           </div>
         ) : isInProgress && data.existingSessionId ? (
           <button
             onClick={() => onResumeWorkout(data.existingSessionId!)}
-            className="w-full bg-[#C9A24D]/20 border border-[#C9A24D]/30 text-[#C9A24D] font-bold text-[10px] tracking-[0.35em] uppercase py-3.5 hover:bg-[#C9A24D]/30 transition-colors"
+            className="w-full bg-[#C9A24D]/15 border border-[#C9A24D]/25 text-[#C9A24D] font-bold text-[10px] tracking-[0.3em] uppercase py-3.5 hover:bg-[#C9A24D]/25 transition-colors"
           >
             Resume Workout
           </button>
@@ -192,7 +216,7 @@ function WorkoutCard({
           <button
             onClick={handleStart}
             disabled={starting}
-            className="w-full bg-[#C9A24D] text-black font-bold text-[10px] tracking-[0.35em] uppercase py-3.5 hover:bg-[#D4B56A] transition-colors disabled:opacity-50"
+            className="w-full bg-[#C9A24D] text-black font-bold text-[11px] tracking-[0.3em] uppercase py-3.5 hover:bg-[#d4af63] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {starting ? "Starting…" : "Start Workout"}
           </button>
@@ -212,6 +236,7 @@ export default function TodayWorkout() {
   const [view, setView] = useState<View>("today");
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [completionPct, setCompletionPct] = useState<number | null>(null);
+  const [workoutName, setWorkoutName] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -228,33 +253,30 @@ export default function TodayWorkout() {
 
   if (loading) {
     return (
-      <div className="border border-white/[0.06] bg-[#0d0e0f]">
-        {/* Header skeleton */}
+      <div className="border border-white/[0.07] bg-[#0d0e0f]">
         <div className="px-5 pt-5 pb-4 border-b border-white/[0.04]">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <div className="h-2 bg-white/[0.05] animate-pulse w-2/5 mb-3" />
-              <div className="h-5 bg-white/[0.07] animate-pulse w-3/4 mb-3" />
+              <div className="h-2 bg-white/[0.05] animate-pulse w-2/5 mb-3 rounded-sm" />
+              <div className="h-5 bg-white/[0.07] animate-pulse w-3/4 mb-3 rounded-sm" />
               <div className="flex gap-3">
-                <div className="h-2 bg-white/[0.04] animate-pulse w-20" />
-                <div className="h-2 bg-white/[0.04] animate-pulse w-16" />
+                <div className="h-2 bg-white/[0.04] animate-pulse w-20 rounded-sm" />
+                <div className="h-2 bg-white/[0.04] animate-pulse w-16 rounded-sm" />
               </div>
             </div>
-            <div className="h-9 w-10 bg-white/[0.04] animate-pulse shrink-0" />
+            <div className="h-9 w-10 bg-white/[0.04] animate-pulse shrink-0 rounded-sm" />
           </div>
         </div>
-        {/* Section preview skeleton */}
         <div className="px-5 py-3 border-b border-white/[0.04] space-y-2.5">
           {([55, 75, 45] as const).map((w, i) => (
             <div key={i} className="flex items-center gap-3">
-              <div className="h-2 bg-white/[0.04] animate-pulse w-16 shrink-0" />
-              <div className="h-2 bg-white/[0.04] animate-pulse flex-1" style={{ maxWidth: `${w}%` }} />
+              <div className="h-2 bg-white/[0.04] animate-pulse w-16 shrink-0 rounded-sm" />
+              <div className="h-2 bg-white/[0.04] animate-pulse flex-1 rounded-sm" style={{ maxWidth: `${w}%` }} />
             </div>
           ))}
         </div>
-        {/* CTA skeleton */}
         <div className="px-5 py-4">
-          <div className="h-12 bg-white/[0.04] animate-pulse" />
+          <div className="h-12 bg-white/[0.04] animate-pulse rounded-sm" />
         </div>
       </div>
     );
@@ -268,7 +290,7 @@ export default function TodayWorkout() {
 
   if (view === "active_session" && activeSessionId) {
     return (
-      <div className="border border-white/[0.06] bg-[#0d0e0f]">
+      <div className="border border-white/[0.07] bg-[#0d0e0f]">
         <WorkoutSession
           sessionId={activeSessionId}
           snapshot={todayData.snapshot}
@@ -276,6 +298,7 @@ export default function TodayWorkout() {
           scheduledDate={todayData.scheduledDate}
           onComplete={(pct) => {
             setCompletionPct(pct);
+            setWorkoutName(todayData.workoutName);
             setView("completed");
           }}
           onCancel={() => setView("today")}
@@ -286,28 +309,32 @@ export default function TodayWorkout() {
 
   if (view === "completed") {
     return (
-      <div className="border border-white/[0.06] bg-[#0d0e0f] p-6 text-center">
-        <div className="w-10 h-10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto mb-4 bg-emerald-500/10">
+      <div className="border border-emerald-500/15 bg-emerald-500/[0.03] px-6 py-8 text-center">
+        <div className="w-10 h-10 border border-emerald-500/25 bg-emerald-500/10 flex items-center justify-center mx-auto mb-5">
           <span className="text-emerald-400 text-base">✓</span>
         </div>
-        <h3 className="text-white text-lg font-bold mb-1">Workout Complete</h3>
-        <p className="text-gray-400 text-sm mb-1">{todayData.workoutName}</p>
+        <h3 className="text-white text-base font-bold tracking-wide mb-0.5">
+          Promise Kept
+        </h3>
+        <p className="text-gray-500 text-sm mb-3">
+          {workoutName ?? todayData.workoutName}
+        </p>
         {completionPct !== null && (
-          <p className="text-[#C9A24D] font-bold text-2xl mb-4">{completionPct}%</p>
+          <p className="text-[#C9A24D] font-bold text-2xl tabular-nums mb-3">
+            {completionPct}%
+          </p>
         )}
-        <p className="text-gray-500 text-xs">
-          Your session has been recorded. Rest up and recover strong.
+        <p className="text-gray-600 text-xs max-w-xs mx-auto leading-relaxed">
+          Session recorded. Rest up, hit your targets, and come back stronger.
         </p>
       </div>
     );
   }
 
-  // Default: workout card
   return (
     <WorkoutCard
       data={todayData}
       onStartWorkout={() => {
-        // Re-fetch session (it was created in WorkoutCard.handleStart)
         fetch("/api/portal/today-workout")
           .then((r) => r.json())
           .then((d: { ok: boolean; result?: TodayResult }) => {

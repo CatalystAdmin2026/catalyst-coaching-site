@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const next = url.searchParams.get("next");
+  const type = url.searchParams.get("type"); // "recovery" | "invite" | "email" | null
   const origin = url.origin;
 
   if (!code) {
@@ -91,6 +92,16 @@ export async function GET(request: NextRequest) {
   ) {
     await supabase.auth.signOut();
     return NextResponse.redirect(`${origin}/login?error=access_denied`);
+  }
+
+  // Special auth types take precedence over role-based redirect.
+  // recovery → password reset screen (session is established, user sets new password)
+  // invite   → first-time password setup screen
+  if (type === "recovery") {
+    return NextResponse.redirect(`${origin}/reset-password`);
+  }
+  if (type === "invite") {
+    return NextResponse.redirect(`${origin}/setup-password`);
   }
 
   const role = dbUser?.role ?? "client";

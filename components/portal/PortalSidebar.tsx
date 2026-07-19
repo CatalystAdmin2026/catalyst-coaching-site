@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Activity, Calendar, FileText, LayoutDashboard, Target } from "lucide-react";
+import LogoutButton from "./LogoutButton";
 
 interface NavItem {
   icon: React.ComponentType<{ size?: number; className?: string }>;
@@ -78,19 +79,24 @@ export default function PortalSidebar({ clientName }: Props) {
       </nav>
 
       {/* Client identity — links to account page */}
-      <Link
-        href="/account"
-        className="px-4 py-4 border-t border-white/[0.06] flex items-center gap-2.5 hover:bg-white/[0.03] transition-colors group"
-        title="Account settings"
-      >
-        <div className="w-7 h-7 rounded-full bg-[#c9a24d]/15 border border-[#c9a24d]/25 flex items-center justify-center shrink-0">
-          <span className="text-[9px] font-bold text-[#c9a24d] leading-none">{initials}</span>
+      <div className="border-t border-white/[0.06]">
+        <Link
+          href="/account"
+          className="px-4 pt-4 pb-2.5 flex items-center gap-2.5 hover:bg-white/[0.03] transition-colors group"
+          title="Account settings"
+        >
+          <div className="w-7 h-7 rounded-full bg-[#c9a24d]/15 border border-[#c9a24d]/25 flex items-center justify-center shrink-0">
+            <span className="text-[9px] font-bold text-[#c9a24d] leading-none">{initials}</span>
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs font-medium text-white/70 group-hover:text-white/85 truncate transition-colors">{clientName}</span>
+            <span className="text-[10px] text-white/30">Account →</span>
+          </div>
+        </Link>
+        <div className="px-4 pb-4">
+          <LogoutButton className="text-[10px]" />
         </div>
-        <div className="flex flex-col min-w-0">
-          <span className="text-xs font-medium text-white/70 group-hover:text-white/85 truncate transition-colors">{clientName}</span>
-          <span className="text-[10px] text-white/30">Account →</span>
-        </div>
-      </Link>
+      </div>
     </aside>
   );
 }
