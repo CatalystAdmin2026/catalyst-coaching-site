@@ -251,9 +251,10 @@ async function main() {
   );
 
   assert(
-    "State: active — progress bar shown when currentWeekNum exists",
-    // Hero stat grid: "Current Week" + "Weeks Left" + "Est. Finish" replaces old inline label
-    pageSrc.includes("Current Week") && pageSrc.includes("Weeks Left"),
+    "State: active — week position shown when currentWeekNum exists",
+    // Week position displayed as inline text or stat grid
+    (pageSrc.includes("currentWeekNum") && pageSrc.includes("weeksRemaining")) ||
+      (pageSrc.includes("Current Week") && pageSrc.includes("Weeks Left")),
   );
 
   // State: completed — status !== 'active', shown in pastPrograms

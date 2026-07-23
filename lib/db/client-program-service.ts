@@ -14,8 +14,11 @@ import {
   workoutTemplates,
   clientProfiles,
 } from "./schema";
+import { clientGoals } from "./schema-profile";
 import {
   clientPrograms,
+  clientProgramWeeks,
+  clientProgramWeekDays,
   programWeeks,
   programWeekDays,
   workoutSessions,
@@ -162,7 +165,11 @@ export async function assignProgram(
 
   // Confirm the program template is published (status='active')
   const [tmpl] = await db
-    .select({ status: programTemplates.status, name: programTemplates.name })
+    .select({
+      status: programTemplates.status,
+      name: programTemplates.name,
+      version: programTemplates.version,
+    })
     .from(programTemplates)
     .where(eq(programTemplates.id, input.programTemplateId))
     .limit(1);
@@ -175,6 +182,38 @@ export async function assignProgram(
     };
   }
 
+  // Fetch template weeks and days for deep copy
+  const templateWeeks = await db
+    .select({
+      id: programWeeks.id,
+      weekNumber: programWeeks.weekNumber,
+      label: programWeeks.label,
+      notes: programWeeks.notes,
+    })
+    .from(programWeeks)
+    .where(eq(programWeeks.programTemplateId, input.programTemplateId))
+    .orderBy(asc(programWeeks.weekNumber));
+
+  const templateDays =
+    templateWeeks.length > 0
+      ? await db
+          .select({
+            id: programWeekDays.id,
+            programWeekId: programWeekDays.programWeekId,
+            dayOfWeek: programWeekDays.dayOfWeek,
+            workoutTemplateId: programWeekDays.workoutTemplateId,
+            label: programWeekDays.label,
+            notes: programWeekDays.notes,
+          })
+          .from(programWeekDays)
+          .where(
+            inArray(
+              programWeekDays.programWeekId,
+              templateWeeks.map((w) => w.id),
+            ),
+          )
+      : [];
+
   const [row] = await db
     .insert(clientPrograms)
     .values({
@@ -185,8 +224,40 @@ export async function assignProgram(
       coachNotes: input.coachNotes ?? null,
       overrideAllowMultiple: input.overrideAllowMultiple ?? false,
       status: "active",
+      sourceTemplateName: tmpl.name,
+      sourceTemplateVersion: tmpl.version,
     })
     .returning();
+
+  // Deep-copy scheduling structure into client-owned rows
+  for (const week of templateWeeks) {
+    const [newWeek] = await db
+      .insert(clientProgramWeeks)
+      .values({
+        clientProgramId: row.id,
+        sourceWeekId: week.id,
+        weekNumber: week.weekNumber,
+        label: week.label,
+        notes: week.notes,
+      })
+      .returning({ id: clientProgramWeeks.id });
+
+    const daysForWeek = templateDays.filter(
+      (d) => d.programWeekId === week.id,
+    );
+    if (daysForWeek.length > 0) {
+      await db.insert(clientProgramWeekDays).values(
+        daysForWeek.map((d) => ({
+          clientProgramWeekId: newWeek.id,
+          sourceDayId: d.id,
+          dayOfWeek: d.dayOfWeek,
+          workoutTemplateId: d.workoutTemplateId,
+          label: d.label,
+          notes: d.notes,
+        })),
+      );
+    }
+  }
 
   return { ok: true, assignment: row };
 }
@@ -457,28 +528,28 @@ export async function getTodayWorkout(
     return { kind: "program_complete" };
   }
 
-  // Find the program week
+  // Find the client's week row (client-owned, not the shared template)
   const [week] = await db
     .select()
-    .from(programWeeks)
+    .from(clientProgramWeeks)
     .where(
       and(
-        eq(programWeeks.programTemplateId, assignment.programTemplateId),
-        eq(programWeeks.weekNumber, weekNumber),
+        eq(clientProgramWeeks.clientProgramId, assignment.id),
+        eq(clientProgramWeeks.weekNumber, weekNumber),
       ),
     )
     .limit(1);
 
   if (!week) return { kind: "rest_day" };
 
-  // Find the day slot
+  // Find the client's day slot
   const [daySlot] = await db
     .select()
-    .from(programWeekDays)
+    .from(clientProgramWeekDays)
     .where(
       and(
-        eq(programWeekDays.programWeekId, week.id),
-        eq(programWeekDays.dayOfWeek, dayOfWeek),
+        eq(clientProgramWeekDays.clientProgramWeekId, week.id),
+        eq(clientProgramWeekDays.dayOfWeek, dayOfWeek),
       ),
     )
     .limit(1);
@@ -565,25 +636,29 @@ export async function getComplianceSummary(
   const elapsed = daysBetween(assignment.startDate, today);
   const weekNumber = Math.max(1, Math.floor(elapsed / 7) + 1);
 
-  // Count scheduled sessions: days with workout_template_id in weeks 1..weekNumber
-  const weeks = await db
-    .select({ id: programWeeks.id, weekNumber: programWeeks.weekNumber })
-    .from(programWeeks)
-    .where(eq(programWeeks.programTemplateId, assignment.programTemplateId));
+  // Count scheduled sessions: client-owned day slots with a workout assigned
+  // in weeks 1..weekNumber
+  const clientWeeks = await db
+    .select({
+      id: clientProgramWeeks.id,
+      weekNumber: clientProgramWeeks.weekNumber,
+    })
+    .from(clientProgramWeeks)
+    .where(eq(clientProgramWeeks.clientProgramId, assignment.id));
 
-  const pastWeekIds = weeks
+  const pastWeekIds = clientWeeks
     .filter((w) => w.weekNumber <= weekNumber)
     .map((w) => w.id);
 
   let scheduledCount = 0;
   if (pastWeekIds.length > 0) {
     const dayRows = await db
-      .select({ id: programWeekDays.id })
-      .from(programWeekDays)
+      .select({ id: clientProgramWeekDays.id })
+      .from(clientProgramWeekDays)
       .where(
         and(
-          inArray(programWeekDays.programWeekId, pastWeekIds),
-          isNotNull(programWeekDays.workoutTemplateId),
+          inArray(clientProgramWeekDays.clientProgramWeekId, pastWeekIds),
+          isNotNull(clientProgramWeekDays.workoutTemplateId),
         ),
       );
     scheduledCount = dayRows.length;
@@ -628,5 +703,219 @@ export async function getComplianceSummary(
     lastCompletedAt,
     nextScheduledDate: null, // future enhancement
     assignmentId: assignment.id,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// PROGRAM PAGE DATA
+//
+// Full data bundle for the client's /portal/program page.
+// Returns the primary active goal (if any), the active program
+// with current-week workout schedule, and all weeks for the
+// journey arc.
+// ─────────────────────────────────────────────────────────────
+
+export interface DaySchedule {
+  dayOfWeek: number;
+  workoutName: string | null;
+  workoutDescription: string | null;
+  estimatedMinutes: number | null;
+  workoutTemplateId: string | null;
+}
+
+export interface ProgramWeekPreview {
+  weekNumber: number;
+  label: string | null;
+  notes: string | null;
+}
+
+export interface ActiveGoalData {
+  id: string;
+  goalType: string;
+  description: string;
+  targetDate: string | null;
+  targetValue: string | null;
+  targetUnit: string | null;
+  status: string;
+}
+
+export interface ActiveProgramData {
+  id: string;
+  programTemplateId: string;
+  programName: string;
+  programDescription: string | null;
+  programCategory: string;
+  coachNotes: string | null;
+  startDate: string;
+  totalWeeks: number | null;
+  currentWeekNum: number | null;
+  currentWeekLabel: string | null;
+  currentWeekNotes: string | null;
+  daysSchedule: DaySchedule[];
+  allWeeks: ProgramWeekPreview[];
+  isPreparing: boolean;
+}
+
+export interface ProgramPageData {
+  goal: ActiveGoalData | null;
+  activeProgram: ActiveProgramData | null;
+}
+
+function buildEmptyWeek(): DaySchedule[] {
+  return Array.from({ length: 7 }, (_, i) => ({
+    dayOfWeek: i,
+    workoutName: null,
+    workoutDescription: null,
+    estimatedMinutes: null,
+    workoutTemplateId: null,
+  }));
+}
+
+function buildDaySchedule(
+  slots: {
+    dayOfWeek: number;
+    workoutTemplateId: string | null;
+    workoutName: string | null;
+    workoutDescription: string | null;
+    estimatedMinutes: number | null;
+  }[],
+): DaySchedule[] {
+  const byDay = new Map(slots.map((s) => [s.dayOfWeek, s]));
+  return Array.from({ length: 7 }, (_, i) => {
+    const slot = byDay.get(i);
+    const isTraining = Boolean(slot?.workoutTemplateId);
+    return {
+      dayOfWeek: i,
+      workoutName: isTraining ? (slot!.workoutName ?? null) : null,
+      workoutDescription: isTraining ? (slot!.workoutDescription ?? null) : null,
+      estimatedMinutes: slot?.estimatedMinutes ?? null,
+      workoutTemplateId: slot?.workoutTemplateId ?? null,
+    };
+  });
+}
+
+export async function getProgramPageData(
+  clientId: string,
+): Promise<ProgramPageData> {
+  const db = getDb();
+  const today = new Date();
+
+  // Primary active goal — lowest priority number wins; null priority last
+  const [goalRow] = await db
+    .select({
+      id: clientGoals.id,
+      goalType: clientGoals.goalType,
+      description: clientGoals.description,
+      targetDate: clientGoals.targetDate,
+      targetValue: clientGoals.targetValue,
+      targetUnit: clientGoals.targetUnit,
+      status: clientGoals.status,
+    })
+    .from(clientGoals)
+    .where(
+      and(
+        eq(clientGoals.clientId, clientId),
+        eq(clientGoals.status, "active"),
+      ),
+    )
+    .orderBy(asc(clientGoals.priority), desc(clientGoals.createdAt))
+    .limit(1);
+
+  const assignment = await getClientActiveProgram(clientId);
+  if (!assignment) {
+    return { goal: goalRow ?? null, activeProgram: null };
+  }
+
+  const [tmpl] = await db
+    .select({
+      name: programTemplates.name,
+      description: programTemplates.description,
+      category: programTemplates.category,
+      totalWeeks: programTemplates.defaultDurationWeeks,
+    })
+    .from(programTemplates)
+    .where(eq(programTemplates.id, assignment.programTemplateId))
+    .limit(1);
+
+  if (!tmpl) return { goal: goalRow ?? null, activeProgram: null };
+
+  const elapsed = daysBetween(assignment.startDate, today);
+  const isPreparing = elapsed < 0;
+  const rawWeekNum = isPreparing ? null : Math.floor(elapsed / 7) + 1;
+
+  // Query client-owned week rows first — totalWeeks must reflect the client's
+  // actual schedule, not the template default, so currentWeekNum caps correctly
+  // when a coach adds or removes weeks for an individual client.
+  const allWeekRows = await db
+    .select({
+      id: clientProgramWeeks.id,
+      weekNumber: clientProgramWeeks.weekNumber,
+      label: clientProgramWeeks.label,
+      notes: clientProgramWeeks.notes,
+    })
+    .from(clientProgramWeeks)
+    .where(eq(clientProgramWeeks.clientProgramId, assignment.id))
+    .orderBy(asc(clientProgramWeeks.weekNumber));
+
+  const totalWeeks = allWeekRows.length > 0 ? allWeekRows.length : tmpl.totalWeeks;
+
+  const currentWeekNum =
+    rawWeekNum === null
+      ? null
+      : totalWeeks
+      ? Math.min(rawWeekNum, totalWeeks)
+      : rawWeekNum;
+
+  // When preparing, show week 1's data as a preview; when active, show current week
+  const displayWeekRow = isPreparing
+    ? allWeekRows.find((w) => w.weekNumber === 1)
+    : allWeekRows.find((w) => w.weekNumber === currentWeekNum);
+
+  let daysSchedule: DaySchedule[] = buildEmptyWeek();
+
+  if (displayWeekRow) {
+    const daySlots = await db
+      .select({
+        dayOfWeek: clientProgramWeekDays.dayOfWeek,
+        workoutTemplateId: clientProgramWeekDays.workoutTemplateId,
+        workoutName: workoutTemplates.name,
+        workoutDescription: workoutTemplates.description,
+        estimatedMinutes: workoutTemplates.estimatedDurationMinutes,
+      })
+      .from(clientProgramWeekDays)
+      .leftJoin(
+        workoutTemplates,
+        eq(clientProgramWeekDays.workoutTemplateId, workoutTemplates.id),
+      )
+      .where(eq(clientProgramWeekDays.clientProgramWeekId, displayWeekRow.id));
+
+    daysSchedule = buildDaySchedule(daySlots);
+  }
+
+  return {
+    goal: goalRow ?? null,
+    activeProgram: {
+      id: assignment.id,
+      programTemplateId: assignment.programTemplateId,
+      // Prefer the snapshotted name so renames don't silently change display;
+      // fall back to live template name for pre-migration rows (should not occur
+      // after backfill but kept as a safe defensive fallback).
+      programName: assignment.sourceTemplateName ?? tmpl.name,
+      programDescription: tmpl.description ?? null,
+      programCategory: tmpl.category,
+      coachNotes: assignment.coachNotes,
+      startDate: assignment.startDate,
+      totalWeeks,
+      currentWeekNum,
+      currentWeekLabel: displayWeekRow?.label ?? null,
+      currentWeekNotes: displayWeekRow?.notes ?? null,
+      daysSchedule,
+      allWeeks: allWeekRows.map((w) => ({
+        weekNumber: w.weekNumber,
+        label: w.label,
+        notes: w.notes,
+      })),
+      isPreparing,
+    },
   };
 }

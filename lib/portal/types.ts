@@ -24,6 +24,7 @@ export type MissionType =
 
 export type PortalScenario =
   | "default"
+  | "first_day"
   | "zero"
   | "all-complete"
   | "recovery"

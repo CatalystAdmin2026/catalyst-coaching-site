@@ -40,6 +40,36 @@ body {
   }
 }
 
+/* ── Milestone unlock — fires once when a milestone transitions from locked to earned */
+@keyframes milestone-unlock {
+  0% {
+    box-shadow: 0 0 0 0 rgba(201, 162, 77, 0);
+    transform: scale(1);
+  }
+  20% {
+    box-shadow: 0 0 0 5px rgba(201, 162, 77, 0.20), 0 0 18px rgba(201, 162, 77, 0.08);
+    transform: scale(1.018);
+  }
+  55% {
+    box-shadow: 0 0 0 2px rgba(201, 162, 77, 0.10);
+    transform: scale(1.008);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(201, 162, 77, 0);
+    transform: scale(1);
+  }
+}
+
+.milestone-unlock {
+  animation: milestone-unlock 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .milestone-unlock {
+    animation: none;
+  }
+}
+
 /* Consistent select styling */
 select {
   appearance: none;

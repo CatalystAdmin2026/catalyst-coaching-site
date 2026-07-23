@@ -6,6 +6,8 @@ interface Props {
 }
 
 const DEBRIEFS: Record<PortalScenario, string> = {
+  first_day:
+    "Your first check-in is where everything begins. Your coach builds your program around your starting point — the more honest your answers, the more precisely the training fits you.",
   default:
     "Your coach sees this data daily. Every logged mission sharpens what comes next — the more consistent your tracking, the tighter the programming gets.",
   zero:

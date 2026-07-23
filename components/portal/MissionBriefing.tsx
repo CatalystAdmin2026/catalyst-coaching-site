@@ -21,6 +21,11 @@ interface BriefingContent {
 }
 
 const BRIEFINGS: Record<PortalScenario, BriefingContent> = {
+  first_day: {
+    coach:
+      "Your coach is ready. Everything you track here — every session, every check-in — becomes evidence that you follow through. Start by telling your coach where you are right now.",
+    tagline: "Day one. The record starts now.",
+  },
   default: {
     coach:
       "Emma, today's upper-body push session is about controlled execution. Stay patient with the tempo and finish strong. Three missions remain — the day isn't done.",

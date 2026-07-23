@@ -195,6 +195,10 @@ export const clientPrograms = pgTable(
       .notNull()
       .default(false),
     coachNotes: text("coach_notes"),
+    // Lineage snapshot — frozen at assignment time so historical records
+    // survive template renames and version increments.
+    sourceTemplateName: text("source_template_name"),
+    sourceTemplateVersion: integer("source_template_version"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -214,6 +218,106 @@ export const clientPrograms = pgTable(
     index("idx_client_programs_enrollment_id").on(table.enrollmentId),
     index("idx_client_programs_template_id").on(table.programTemplateId),
     index("idx_client_programs_status").on(table.status),
+  ],
+);
+
+// ─────────────────────────────────────────────────────────────
+// TABLE 3B — client_program_weeks
+//
+// Client-owned copy of the program week structure, created at
+// assignment time. Independent from program_weeks — edits here
+// affect only this client and never touch the template.
+//
+// source_week_id preserves the lineage back to the template week
+// this row was copied from, enabling future "sync from template"
+// diff workflows. SET NULL on deletion so template cleanup never
+// breaks a client's active program.
+// ─────────────────────────────────────────────────────────────
+
+export const clientProgramWeeks = pgTable(
+  "client_program_weeks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clientProgramId: uuid("client_program_id")
+      .notNull()
+      .references(() => clientPrograms.id, { onDelete: "restrict" }),
+    sourceWeekId: uuid("source_week_id").references(
+      () => programWeeks.id,
+      { onDelete: "set null" },
+    ),
+    weekNumber: integer("week_number").notNull(),
+    label: text("label"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("uq_client_program_week").on(
+      table.clientProgramId,
+      table.weekNumber,
+    ),
+    index("idx_client_program_weeks_program_id").on(table.clientProgramId),
+    index("idx_client_program_weeks_source_week").on(table.sourceWeekId),
+    check("chk_client_week_number_positive", sql`${table.weekNumber} >= 1`),
+  ],
+);
+
+// ─────────────────────────────────────────────────────────────
+// TABLE 3C — client_program_week_days
+//
+// Client-owned copy of the day-level scheduling, created at
+// assignment time. workout_template_id continues to reference
+// the shared workout_templates table — workout blueprints remain
+// reusable reference data, only the scheduling layer is copied.
+//
+// source_day_id preserves lineage back to the template day row.
+// SET NULL on deletion so coaches can clean up their template
+// library without affecting active client schedules.
+// ─────────────────────────────────────────────────────────────
+
+export const clientProgramWeekDays = pgTable(
+  "client_program_week_days",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clientProgramWeekId: uuid("client_program_week_id")
+      .notNull()
+      .references(() => clientProgramWeeks.id, { onDelete: "restrict" }),
+    sourceDayId: uuid("source_day_id").references(
+      () => programWeekDays.id,
+      { onDelete: "set null" },
+    ),
+    dayOfWeek: integer("day_of_week").notNull(),
+    workoutTemplateId: uuid("workout_template_id").references(
+      () => workoutTemplates.id,
+      { onDelete: "restrict" },
+    ),
+    label: text("label"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("uq_client_program_week_day").on(
+      table.clientProgramWeekId,
+      table.dayOfWeek,
+    ),
+    index("idx_client_program_week_days_week_id").on(table.clientProgramWeekId),
+    index("idx_client_program_week_days_workout_template").on(
+      table.workoutTemplateId,
+    ),
+    index("idx_client_program_week_days_source_day").on(table.sourceDayId),
+    check(
+      "chk_client_day_of_week_range",
+      sql`${table.dayOfWeek} >= 0 AND ${table.dayOfWeek} <= 6`,
+    ),
   ],
 );
 
@@ -369,6 +473,12 @@ export type NewProgramWeekDay = typeof programWeekDays.$inferInsert;
 
 export type ClientProgram = typeof clientPrograms.$inferSelect;
 export type NewClientProgram = typeof clientPrograms.$inferInsert;
+
+export type ClientProgramWeek = typeof clientProgramWeeks.$inferSelect;
+export type NewClientProgramWeek = typeof clientProgramWeeks.$inferInsert;
+
+export type ClientProgramWeekDay = typeof clientProgramWeekDays.$inferSelect;
+export type NewClientProgramWeekDay = typeof clientProgramWeekDays.$inferInsert;
 
 export type WorkoutSession = typeof workoutSessions.$inferSelect;
 export type NewWorkoutSession = typeof workoutSessions.$inferInsert;

@@ -17,6 +17,7 @@
 
 import { useState, useCallback, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   saveDraftCheckInAction,
   submitCheckInAction,
@@ -31,6 +32,23 @@ import {
 // ─────────────────────────────────────────────────────────────
 // TYPES
 // ─────────────────────────────────────────────────────────────
+
+// Measurement values from the most recent reviewed check-in.
+// Passed from the server so clients can reflect on last week's
+// values while filling in this week's form.
+export interface PreviousCheckInContext {
+  bodyWeightLbs: string | null;
+  waistInches: string | null;
+  averageSleepHours: string | null;
+  averageStress: number | null;
+  averageEnergy: number | null;
+  averageHunger: number | null;
+  digestionRating: number | null;
+  averageWaterOunces: number | null;
+  averageSteps: number | null;
+  workoutCompliancePct: number | null;
+  nutritionCompliancePct: number | null;
+}
 
 interface FormState {
   bodyWeightLbs: string;
@@ -54,6 +72,7 @@ interface Props {
   initialData?: Partial<FormState>;
   existingCheckInId?: string;
   weekStartDate: string;
+  previousCheckIn?: PreviousCheckInContext | null;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -114,6 +133,16 @@ function NumberInput({
   );
 }
 
+// Subtle secondary line shown below a field when previous check-in data exists.
+// Acts as a reflection anchor — not a comparison or judgment.
+function PrevHint({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[10px] text-gray-600 mt-1.5">
+      Last week: {children}
+    </p>
+  );
+}
+
 function RatingSlider({
   value,
   onChange,
@@ -122,6 +151,7 @@ function RatingSlider({
   max = 10,
   lowLabel,
   highLabel,
+  prevValue,
 }: {
   value: number | null;
   onChange: (v: number | null) => void;
@@ -130,6 +160,7 @@ function RatingSlider({
   max?: number;
   lowLabel?: string;
   highLabel?: string;
+  prevValue?: number | null;
 }) {
   const display = value !== null ? String(value) : "—";
   const fillPct =
@@ -204,6 +235,9 @@ function RatingSlider({
           </button>
         ))}
       </div>
+      {prevValue !== null && prevValue !== undefined && (
+        <PrevHint>{prevValue} / 10</PrevHint>
+      )}
     </div>
   );
 }
@@ -212,10 +246,12 @@ function ComplianceSlider({
   value,
   onChange,
   label,
+  prevValue,
 }: {
   value: number | null;
   onChange: (v: number | null) => void;
   label: string;
+  prevValue?: number | null;
 }) {
   const fillPct = value !== null ? value : 0;
   const display = value !== null ? `${value}%` : "—";
@@ -260,7 +296,6 @@ function ComplianceSlider({
           step={5}
           value={value ?? 0}
           onChange={(e) => onChange(Number(e.target.value))}
-          onClick={() => { if (value === null) onChange(75); }}
           className="absolute inset-0 w-full opacity-0 cursor-pointer"
           aria-label={label}
         />
@@ -273,6 +308,9 @@ function ComplianceSlider({
         >
           Clear
         </button>
+      )}
+      {prevValue !== null && prevValue !== undefined && (
+        <PrevHint>{prevValue}%</PrevHint>
       )}
     </div>
   );
@@ -358,7 +396,7 @@ function formToServiceData(f: FormState): CheckInDraftData {
   };
 }
 
-export default function CheckInForm({ initialData, existingCheckInId, weekStartDate }: Props) {
+export default function CheckInForm({ initialData, existingCheckInId, weekStartDate, previousCheckIn }: Props) {
   const router = useRouter();
   const [form, setFormState] = useState<FormState>({
     ...EMPTY_STATE,
@@ -448,7 +486,6 @@ export default function CheckInForm({ initialData, existingCheckInId, weekStartD
         const submitResult = await submitCheckInAction(id);
         if (submitResult.ok) {
           setSubmitted(true);
-          router.push("/portal/check-ins");
         } else {
           setSaveError(submitResult.error ?? "Failed to submit check-in.");
         }
@@ -473,7 +510,6 @@ export default function CheckInForm({ initialData, existingCheckInId, weekStartD
         const result = await submitCheckInAction(checkInId);
         if (result.ok) {
           setSubmitted(true);
-          router.push("/portal/check-ins");
         } else {
           setSaveError(result.error ?? "Failed to submit check-in.");
         }
@@ -489,12 +525,31 @@ export default function CheckInForm({ initialData, existingCheckInId, weekStartD
 
   if (submitted) {
     return (
-      <div className="text-center py-12">
-        <div className="w-10 h-10 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto mb-4">
-          <span className="text-emerald-400 text-lg">✓</span>
+      <div className="py-4">
+        <div className="border-l-2 border-[#C9A24D]/50 pl-5">
+          <p className="text-white text-base font-semibold mb-4">
+            Your coach has everything they need.
+          </p>
+          <div className="space-y-3">
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Thank you for being honest.
+            </p>
+            <p className="text-gray-500 text-[13px] leading-relaxed">
+              The more honest your check-ins are, the better your coach can help you.
+            </p>
+            <p className="text-gray-500 text-[13px] leading-relaxed">
+              Your coach will review this and respond as soon as possible.
+            </p>
+          </div>
         </div>
-        <p className="text-white font-semibold">Check-in submitted</p>
-        <p className="text-gray-500 text-sm mt-1">Your coach will respond soon.</p>
+        <div className="mt-10 pt-6 border-t border-white/[0.06]">
+          <Link
+            href="/portal/check-ins"
+            className="text-[10px] text-gray-500 uppercase tracking-[0.25em] hover:text-gray-300 transition-colors"
+          >
+            ← Return to Check-Ins
+          </Link>
+        </div>
       </div>
     );
   }
@@ -529,6 +584,9 @@ export default function CheckInForm({ initialData, existingCheckInId, weekStartD
               min="0.1"
             />
             <FieldError message={fieldErrors.bodyWeightLbs} />
+            {previousCheckIn?.bodyWeightLbs && (
+              <PrevHint>{previousCheckIn.bodyWeightLbs} lbs</PrevHint>
+            )}
           </div>
           <div>
             <FieldLabel optional>Waist (inches)</FieldLabel>
@@ -540,6 +598,9 @@ export default function CheckInForm({ initialData, existingCheckInId, weekStartD
               min="0.25"
             />
             <FieldError message={fieldErrors.waistInches} />
+            {previousCheckIn?.waistInches && (
+              <PrevHint>{previousCheckIn.waistInches}"</PrevHint>
+            )}
           </div>
         </div>
       </section>
@@ -563,6 +624,9 @@ export default function CheckInForm({ initialData, existingCheckInId, weekStartD
               max="24"
             />
             <FieldError message={fieldErrors.averageSleepHours} />
+            {previousCheckIn?.averageSleepHours && (
+              <PrevHint>{previousCheckIn.averageSleepHours} hrs/night</PrevHint>
+            )}
           </div>
           <RatingSlider
             value={form.averageStress}
@@ -570,6 +634,7 @@ export default function CheckInForm({ initialData, existingCheckInId, weekStartD
             label="Stress level"
             lowLabel="1 — Calm"
             highLabel="10 — Maxed"
+            prevValue={previousCheckIn?.averageStress}
           />
           <RatingSlider
             value={form.averageEnergy}
@@ -577,6 +642,7 @@ export default function CheckInForm({ initialData, existingCheckInId, weekStartD
             label="Energy level"
             lowLabel="1 — Depleted"
             highLabel="10 — Peak"
+            prevValue={previousCheckIn?.averageEnergy}
           />
           <RatingSlider
             value={form.averageHunger}
@@ -584,6 +650,7 @@ export default function CheckInForm({ initialData, existingCheckInId, weekStartD
             label="Hunger level"
             lowLabel="1 — Never hungry"
             highLabel="10 — Always starving"
+            prevValue={previousCheckIn?.averageHunger}
           />
           <RatingSlider
             value={form.digestionRating}
@@ -591,6 +658,7 @@ export default function CheckInForm({ initialData, existingCheckInId, weekStartD
             label="Digestion"
             lowLabel="1 — Poor"
             highLabel="10 — Great"
+            prevValue={previousCheckIn?.digestionRating}
           />
         </div>
       </section>
@@ -614,6 +682,9 @@ export default function CheckInForm({ initialData, existingCheckInId, weekStartD
                 min="0"
               />
               <FieldError message={fieldErrors.averageWaterOunces} />
+              {previousCheckIn?.averageWaterOunces != null && (
+                <PrevHint>{previousCheckIn.averageWaterOunces} oz/day</PrevHint>
+              )}
             </div>
             <div>
               <FieldLabel optional>Steps (daily avg)</FieldLabel>
@@ -625,17 +696,22 @@ export default function CheckInForm({ initialData, existingCheckInId, weekStartD
                 min="0"
               />
               <FieldError message={fieldErrors.averageSteps} />
+              {previousCheckIn?.averageSteps != null && (
+                <PrevHint>{previousCheckIn.averageSteps.toLocaleString()} steps</PrevHint>
+              )}
             </div>
           </div>
           <ComplianceSlider
             value={form.workoutCompliancePct}
             onChange={(v) => setField("workoutCompliancePct", v)}
             label="Workout compliance"
+            prevValue={previousCheckIn?.workoutCompliancePct}
           />
           <ComplianceSlider
             value={form.nutritionCompliancePct}
             onChange={(v) => setField("nutritionCompliancePct", v)}
             label="Nutrition compliance"
+            prevValue={previousCheckIn?.nutritionCompliancePct}
           />
         </div>
       </section>

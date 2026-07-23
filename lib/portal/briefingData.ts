@@ -26,6 +26,11 @@ export interface MissionBriefing {
 // Scenario-keyed coaching copy. Rotate, refine, or replace freely.
 
 const MOCK_BRIEFINGS: Record<PortalScenario, MissionBriefing> = {
+  first_day: {
+    coachingMessage:
+      "Your coach is ready. Everything you track here becomes evidence that you follow through. Start by telling your coach where you are right now — your first check-in is how this begins.",
+    missionLine: "Day one. The record starts now.",
+  },
   default: {
     coachingMessage:
       "Your upper-body push session is loaded and ready. Three missions are still open. Every rep you choose today is a vote for the athlete you are becoming.",

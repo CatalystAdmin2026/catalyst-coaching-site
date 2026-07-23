@@ -21,7 +21,9 @@
 import "server-only";
 import { eq, and, asc, desc, or, inArray, sql } from "drizzle-orm";
 import { getDb } from "./client";
+import { createNotification } from "./notification-service";
 import { users, clientProfiles, coachingEnrollments, timelineEvents } from "./schema";
+import { clientGoals } from "./schema-profile";
 import { weeklyCheckIns } from "./schema-check-in";
 import type { WeeklyCheckInStatus } from "./schema-check-in";
 import type { CheckInDetail } from "./check-in-service";
@@ -424,6 +426,19 @@ export async function markCheckInReviewed(
     throw err;
   }
 
+  // Notify the client that their check-in was reviewed.
+  // Runs outside the transaction — notification failure must not
+  // roll back the review itself.
+  await createNotification({
+    clientId: checkIn.clientId,
+    actorId: coachId,
+    eventType: "check_in_reviewed",
+    resourceType: "check_in",
+    resourceId: checkInId,
+    title: "Your coach reviewed your check-in",
+    body: response.trim() ? "Your coach left a response." : null,
+  });
+
   return { ok: true };
 }
 
@@ -431,16 +446,26 @@ export async function markCheckInReviewed(
 // REOPEN CHECK-IN
 //
 // reviewed → in_review (explicit coach action only)
+//
+// Emits a timeline event recording which coach reopened the
+// check-in and when the previous review occurred, so the full
+// review history is preserved in the audit trail.
 // ─────────────────────────────────────────────────────────────
 
 export async function reopenCheckIn(
   checkInId: string,
-  _coachId: string,
+  coachId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const db = getDb();
 
   const [checkIn] = await db
-    .select({ id: weeklyCheckIns.id, status: weeklyCheckIns.status })
+    .select({
+      id: weeklyCheckIns.id,
+      status: weeklyCheckIns.status,
+      clientId: weeklyCheckIns.clientId,
+      weekStartDate: weeklyCheckIns.weekStartDate,
+      coachReviewedAt: weeklyCheckIns.coachReviewedAt,
+    })
     .from(weeklyCheckIns)
     .where(eq(weeklyCheckIns.id, checkInId))
     .limit(1);
@@ -453,14 +478,39 @@ export async function reopenCheckIn(
     };
   }
 
+  const now = new Date();
+
+  // Clear coachReviewedAt — the check-in is back in in_review and no
+  // longer in a terminal reviewed state. The previous review timestamp
+  // is preserved in the timeline event below.
   await db
     .update(weeklyCheckIns)
     .set({
       status: "in_review",
       coachReviewedAt: null,
-      updatedAt: new Date(),
+      updatedAt: now,
     })
     .where(eq(weeklyCheckIns.id, checkInId));
+
+  const prevReviewLabel = checkIn.coachReviewedAt
+    ? new Date(checkIn.coachReviewedAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : null;
+
+  await db.insert(timelineEvents).values({
+    clientId: checkIn.clientId,
+    eventType: "check_in_reopened",
+    actorId: coachId,
+    actorRole: "coach",
+    title: "Check-in reopened for revision",
+    description: prevReviewLabel
+      ? `Week of ${checkIn.weekStartDate} — previously reviewed ${prevReviewLabel}`
+      : `Week of ${checkIn.weekStartDate}`,
+    occurredAt: now,
+  });
 
   return { ok: true };
 }
@@ -503,6 +553,59 @@ export async function getClientCheckInSummary(
     totalCheckIns: rows.length,
     pendingCount,
     lastCheckIn,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// GET CLIENT GOAL CONTEXT (for coach review panel)
+//
+// Returns the client's active goal for display alongside the
+// check-in review. Gives the coach immediate context on what
+// the client is working toward without leaving the review page.
+// ─────────────────────────────────────────────────────────────
+
+export interface ClientGoalContext {
+  id: string;
+  goalType: string;
+  description: string;
+  targetValue: string | null;
+  targetUnit: string | null;
+  targetDate: string | null;
+}
+
+export async function getClientGoalContext(
+  clientId: string,
+): Promise<ClientGoalContext | null> {
+  const db = getDb();
+
+  const [goal] = await db
+    .select({
+      id: clientGoals.id,
+      goalType: clientGoals.goalType,
+      description: clientGoals.description,
+      targetValue: clientGoals.targetValue,
+      targetUnit: clientGoals.targetUnit,
+      targetDate: clientGoals.targetDate,
+    })
+    .from(clientGoals)
+    .where(
+      and(
+        eq(clientGoals.clientId, clientId),
+        eq(clientGoals.status, "active"),
+      ),
+    )
+    .orderBy(asc(clientGoals.priority), desc(clientGoals.createdAt))
+    .limit(1);
+
+  if (!goal) return null;
+
+  return {
+    id: goal.id,
+    goalType: goal.goalType,
+    description: goal.description,
+    targetValue: goal.targetValue ?? null,
+    targetUnit: goal.targetUnit ?? null,
+    targetDate: goal.targetDate ?? null,
   };
 }
 

@@ -9,10 +9,19 @@ interface Props {
 export default function PortalShell({ children, clientName }: Props) {
   return (
     <div className="min-h-screen bg-[#080909] text-[#f0efeb]">
+      {/* Atmospheric warm glow — very subtle, breaks flat darkness */}
+      <div
+        className="pointer-events-none fixed inset-x-0 top-0 h-[45vh] z-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 80% 50% at 50% 0%, rgba(201,162,77,0.038) 0%, transparent 100%)",
+        }}
+        aria-hidden
+      />
+
       <PortalSidebar clientName={clientName} />
 
-      {/* Main content — offset by sidebar width on desktop */}
-      <main className="lg:ml-56 min-h-screen flex flex-col">
+      <main className="lg:ml-56 min-h-screen flex flex-col relative z-10">
         <div className="flex-1 max-w-3xl w-full mx-auto px-5 md:px-8 py-10 pb-28 lg:pb-14 flex flex-col gap-10">
           {children}
         </div>

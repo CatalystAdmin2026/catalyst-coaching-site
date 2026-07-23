@@ -94,6 +94,14 @@ function checkin(status: Mission["status"] = "not-started"): Mission {
 // ─────────────────────────────────────────────────────────────
 
 const SCENARIOS: Record<PortalScenario, ScenarioData> = {
+  first_day: {
+    clientName: CLIENT_NAME,
+    missions: [
+      checkin("not-started"),
+    ],
+    stats: { streak: 0, lifetimePromises: 0 },
+  },
+
   default: {
     clientName: CLIENT_NAME,
     missions: [
@@ -193,6 +201,7 @@ export function getScenarioData(scenario: PortalScenario): ScenarioData {
 }
 
 export const SCENARIO_LABELS: Record<PortalScenario, string> = {
+  first_day:          "Day 1 — New Client",
   default:            "4 of 6 Complete",
   zero:               "0% — Nothing Started",
   "all-complete":     "All Complete",

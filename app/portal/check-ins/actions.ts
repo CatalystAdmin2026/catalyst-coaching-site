@@ -64,6 +64,14 @@ export async function editSubmittedCheckInAction(
     return { ok: false, error: "Forbidden" };
   }
 
+  // Server-side validation before the service call — returns structured
+  // field errors the client can display, rather than relying on DB CHECK
+  // constraint failures to surface malformed data.
+  const fieldErrors = validateCheckInDraft(data);
+  if (hasFieldErrors(fieldErrors)) {
+    return { ok: false, fieldErrors };
+  }
+
   try {
     const result = await editSubmittedCheckIn(dbUser.id, checkInId, data);
     if (result.ok) {

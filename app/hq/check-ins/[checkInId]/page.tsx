@@ -12,7 +12,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import HQBreadcrumbs from "@/components/hq/HQBreadcrumbs";
-import { getCoachCheckInDetail } from "@/lib/db/coach-check-in-service";
+import {
+  getCoachCheckInDetail,
+  getClientGoalContext,
+} from "@/lib/db/coach-check-in-service";
 import CheckInReviewPanel from "@/components/hq/check-ins/CheckInReviewPanel";
 import type { CheckInDetail } from "@/lib/db/check-in-service";
 
@@ -35,6 +38,15 @@ const STATUS_LABEL: Record<string, string> = {
   submitted: "Waiting for Review",
   in_review: "In Review",
   reviewed: "Reviewed",
+};
+
+const GOAL_TYPE_LABEL: Record<string, string> = {
+  fat_loss: "Fat Loss",
+  muscle_gain: "Muscle Gain",
+  body_recomposition: "Body Recomposition",
+  general_health: "General Health",
+  maintenance: "Maintenance",
+  custom: "Custom",
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -329,6 +341,8 @@ export default async function CheckInReviewPage({
   const checkIn = await getCoachCheckInDetail(checkInId);
   if (!checkIn) notFound();
 
+  const goalContext = await getClientGoalContext(checkIn.clientId);
+
   const weekLabel = fmtDate(checkIn.weekStartDate);
 
   return (
@@ -412,8 +426,59 @@ export default async function CheckInReviewPage({
           )}
         </div>
 
-        {/* Right: Coach review panel */}
+        {/* Right: Goal context + coach review panel */}
         <div className="space-y-5">
+          {/* Goal context — lightweight summary so the coach has
+              immediate context on what the client is working toward
+              without navigating to the client workspace. */}
+          {goalContext && (
+            <div className="bg-[#0a0b0c] border border-white/[0.06] px-4 py-3 space-y-2">
+              <p className="text-[9px] text-gray-500 uppercase tracking-[0.4em]">
+                Goal Context
+              </p>
+              <p className="text-white text-sm font-medium">
+                {GOAL_TYPE_LABEL[goalContext.goalType] ?? goalContext.goalType}
+              </p>
+              <p className="text-gray-500 text-xs leading-relaxed">
+                {goalContext.description}
+              </p>
+              {(goalContext.targetValue || checkIn.bodyWeightLbs || goalContext.targetDate) && (
+                <div className="pt-2 space-y-1 border-t border-white/[0.04]">
+                  {goalContext.targetValue && goalContext.targetUnit && (
+                    <div className="flex items-center gap-3">
+                      <p className="text-[9px] text-gray-500 uppercase tracking-[0.2em] w-16 shrink-0">
+                        Target
+                      </p>
+                      <p className="text-white text-sm">
+                        {goalContext.targetValue} {goalContext.targetUnit}
+                      </p>
+                    </div>
+                  )}
+                  {checkIn.bodyWeightLbs && (
+                    <div className="flex items-center gap-3">
+                      <p className="text-[9px] text-gray-500 uppercase tracking-[0.2em] w-16 shrink-0">
+                        This week
+                      </p>
+                      <p className="text-white text-sm">
+                        {checkIn.bodyWeightLbs} lbs
+                      </p>
+                    </div>
+                  )}
+                  {goalContext.targetDate && (
+                    <div className="flex items-center gap-3">
+                      <p className="text-[9px] text-gray-500 uppercase tracking-[0.2em] w-16 shrink-0">
+                        By
+                      </p>
+                      <p className="text-white text-sm">
+                        {fmtDate(goalContext.targetDate, true)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <CheckInReviewPanel
             checkInId={checkIn.id}
             status={checkIn.status}

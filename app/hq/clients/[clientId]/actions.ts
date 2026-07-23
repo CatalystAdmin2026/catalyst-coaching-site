@@ -9,10 +9,11 @@
 // ─────────────────────────────────────────────────────────────
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { getDb } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
+import { clientGoals, type GoalType } from "@/lib/db/schema-profile";
 import { archiveAndAssignProgram } from "@/lib/db/coach-program-assignment-service";
 
 // ─────────────────────────────────────────────────────────────
@@ -90,4 +91,62 @@ export async function assignProgramAction(data: {
   }
 
   return result.ok ? { ok: true } : { ok: false, error: result.error };
+}
+
+// ─────────────────────────────────────────────────────────────
+// GOAL ACTIONS
+//
+// Create a new active goal for the client (coach-created).
+// Archive (supersede) an existing goal.
+// Goals are never deleted — status changes only.
+// ─────────────────────────────────────────────────────────────
+
+export async function saveGoalAction(data: {
+  clientId: string;
+  goalType: GoalType;
+  description: string;
+  targetDate?: string | null;
+}): Promise<{ ok: boolean; error?: string }> {
+  const auth = await assertCoachOrAdmin();
+  if (!auth.ok) return { ok: false, error: auth.error };
+
+  if (!data.clientId || !data.description.trim()) {
+    return { ok: false, error: "Missing required fields." };
+  }
+
+  const db = getDb();
+  const today = new Date().toISOString().slice(0, 10);
+
+  await db.insert(clientGoals).values({
+    clientId: data.clientId,
+    goalType: data.goalType,
+    description: data.description.trim(),
+    targetDate: data.targetDate ?? null,
+    status: "active",
+    startedAt: today,
+  });
+
+  revalidatePath(`/hq/clients/${data.clientId}`);
+  return { ok: true };
+}
+
+export async function archiveGoalAction(
+  goalId: string,
+  clientId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const auth = await assertCoachOrAdmin();
+  if (!auth.ok) return { ok: false, error: auth.error };
+
+  if (!goalId || !clientId) {
+    return { ok: false, error: "Missing required fields." };
+  }
+
+  const db = getDb();
+  await db
+    .update(clientGoals)
+    .set({ status: "superseded", updatedAt: new Date() })
+    .where(and(eq(clientGoals.id, goalId), eq(clientGoals.clientId, clientId)));
+
+  revalidatePath(`/hq/clients/${clientId}`);
+  return { ok: true };
 }

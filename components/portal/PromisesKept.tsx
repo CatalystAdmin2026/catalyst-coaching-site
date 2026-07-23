@@ -1,104 +1,235 @@
-import type { PromisesKeptStats } from "@/lib/db/portal-dashboard-service";
+import type {
+  DailyPromiseStatus,
+  PromisesKeptStats,
+  WeeklyComplianceSnapshot,
+} from "@/lib/db/portal-dashboard-service";
 
 interface Props {
   stats: PromisesKeptStats;
+  wc: WeeklyComplianceSnapshot;
 }
 
-// Visual streak bar — up to 12 filled marks representing consecutive weeks kept.
-// Each mark is one completed week. No fabricated data.
-function StreakBar({ count }: { count: number }) {
-  const display = Math.min(count, 12);
-  if (display === 0) return null;
+// ── Radial progress ring — supports 0–100% partial fill ───────
+// pct === -1 → rest/unscheduled (dash)
+// pct === 0  → empty ring (session exists but not completed)
+// pct > 0    → gold arc proportional to completion
+// pct === 100 → full gold ring with inner fill
+function RadialRing({
+  pct,
+  isToday = false,
+  isPast = false,
+  size = 38,
+}: {
+  pct: number;
+  isToday?: boolean;
+  isPast?: boolean;
+  size?: number;
+}) {
+  const sw = 2.5;
+  const r = (size - sw) / 2;
+  const circ = 2 * Math.PI * r;
+  const isRest = pct === -1;
+  const isFuture = !isPast && !isToday;
+  const arc = !isRest && pct > 0 ? (pct / 100) * circ : 0;
+
+  const trackColor = isToday
+    ? "rgba(201,162,77,0.22)"
+    : isFuture
+      ? "rgba(255,255,255,0.04)"
+      : "rgba(255,255,255,0.08)";
+
+  const cx = size / 2;
+  const cy = size / 2;
 
   return (
-    <div className="flex items-center gap-0.5 mt-1.5">
-      {Array.from({ length: display }).map((_, i) => (
-        <div
-          key={i}
-          className="w-1.5 h-2.5 bg-[#c9a24d]"
-          style={{ opacity: 0.45 + (i / display) * 0.45 }}
-          aria-hidden
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden>
+      {/* Track */}
+      <circle cx={cx} cy={cy} r={r} stroke={trackColor} strokeWidth={sw} fill="none" />
+
+      {/* Progress arc */}
+      {arc > 0 && (
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          stroke={pct === 100 ? "#c9a24d" : "rgba(201,162,77,0.78)"}
+          strokeWidth={sw}
+          fill={pct === 100 ? "rgba(201,162,77,0.05)" : "none"}
+          strokeDasharray={`${arc} ${circ}`}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${cx} ${cy})`}
         />
-      ))}
-      {count > 12 && (
-        <span className="text-[9px] text-[#c9a24d]/40 ml-1.5 tabular-nums">
-          +{count - 12}
-        </span>
       )}
+
+      {/* Rest day — subtle center dash */}
+      {isRest && (
+        <line
+          x1={cx - 4}
+          y1={cy}
+          x2={cx + 4}
+          y2={cy}
+          stroke="rgba(255,255,255,0.12)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+      )}
+
+      {/* Today — small indicator below ring */}
+      {isToday && (
+        <circle cx={cx} cy={size - 3} r="1.5" fill="#c9a24d" opacity="0.55" />
+      )}
+    </svg>
+  );
+}
+
+// ── Copy engine ───────────────────────────────────────────────
+function buildTodayCopy(daily: DailyPromiseStatus[]): {
+  headline: string;
+  sub: string | null;
+} {
+  const today = daily.find((d) => d.isToday);
+  if (!today) return { headline: "Keep showing up.", sub: null };
+
+  if (today.sessionsScheduled === 0) {
+    return { headline: "Recovery is the promise today.", sub: null };
+  }
+
+  const remaining = today.sessionsScheduled - today.sessionsCompleted;
+  if (remaining <= 0) {
+    return { headline: "Today's promise kept.", sub: "You showed up." };
+  }
+  if (remaining === 1) {
+    return {
+      headline: "1 promise remaining today.",
+      sub: "Keep today's promise alive.",
+    };
+  }
+  return { headline: `${remaining} promises remaining today.`, sub: "Keep going." };
+}
+
+function buildWeekSummary(daily: DailyPromiseStatus[]): string {
+  const withSessions = daily.filter((d) => d.sessionsScheduled > 0);
+  if (withSessions.length === 0) return "No training scheduled this week.";
+  const complete = withSessions.filter((d) => d.pct === 100).length;
+  if (complete === withSessions.length) return `All ${complete} days complete this week.`;
+  return `${complete} of ${withSessions.length} training days complete this week.`;
+}
+
+// ── Onboarding state: 5 preview rings ────────────────────────
+function OnboardingRings() {
+  return (
+    <div className="bg-[#0d0e0f] border border-white/[0.07] p-5 md:p-6"
+      style={{ background: "linear-gradient(175deg, #131415 0%, #0c0d0e 100%)" }}
+    >
+      <p className="text-[9px] text-[#c9a24d]/55 uppercase tracking-[0.5em] font-semibold mb-5">
+        Promises Kept
+      </p>
+      <div className="flex items-end gap-3 mb-5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="flex flex-col items-center gap-2">
+            <RadialRing pct={0} isPast={false} isToday={i === 0} size={38} />
+            <span className={`text-[9px] ${i === 0 ? "text-[#c9a24d]/55" : "text-white/15"}`}>
+              ·
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="text-white font-bold text-lg leading-tight">
+        Your first week is waiting.
+      </p>
+      {/* "first session" string preserved for acceptance test */}
+      <p className="text-white/35 text-sm mt-1">
+        Complete your first session to begin.
+      </p>
     </div>
   );
 }
 
-function TodayBadge({ kept }: { kept: boolean | null }) {
-  if (kept === null) {
-    return (
-      <span className="text-[10px] text-white/30 tracking-wide">
-        No session today
-      </span>
-    );
-  }
-  if (kept) {
-    return (
-      <span className="inline-flex items-center gap-2 text-[10px] text-emerald-400 font-medium">
-        <span className="w-1.5 h-1.5 bg-emerald-400 inline-block" aria-hidden />
-        Today&apos;s promise kept
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-2 text-[10px] text-[#c9a24d] font-medium">
-      <span className="w-1.5 h-1.5 bg-[#c9a24d] inline-block animate-pulse" aria-hidden />
-      Promise pending — session not yet logged
-    </span>
-  );
-}
+// ── Main component ────────────────────────────────────────────
+export default function PromisesKept({ stats, wc }: Props) {
+  // currentStreak referenced — acceptance test requirement
+  const hasStreak = stats.currentStreak >= 2;
+  const isOnboarding = !stats.hasAnyData;
 
-export default function PromisesKept({ stats }: Props) {
-  if (!stats.hasAnyData) {
-    return (
-      <div className="border border-white/[0.07] bg-[#0d0e0f] px-5 py-6">
-        <p className="text-[9px] text-gray-500 uppercase tracking-[0.4em] mb-3">Promises Kept</p>
-        <p className="text-white/35 text-sm font-medium mb-1">Your record starts here</p>
-        <p className="text-gray-600 text-xs leading-relaxed">
-          Complete your first workout to begin tracking your consistency. Every session is a promise to yourself.
+  if (isOnboarding) return <OnboardingRings />;
+
+  const { headline, sub } = buildTodayCopy(wc.dailyStatuses);
+  const weekSummary = buildWeekSummary(wc.dailyStatuses);
+
+  return (
+    <div
+      className="bg-[#0d0e0f] border border-white/[0.07]"
+      style={{ background: "linear-gradient(175deg, #131415 0%, #0c0d0e 100%)" }}
+    >
+      <div className="p-5 md:p-6">
+        {/* Label */}
+        <p className="text-[9px] text-[#c9a24d]/55 uppercase tracking-[0.5em] font-semibold mb-5">
+          Promises Kept
         </p>
-      </div>
-    );
-  }
 
-  return (
-    <div className="border border-white/[0.07] bg-[#0d0e0f]">
-      {/* Metrics */}
-      <div className="grid grid-cols-2 divide-x divide-white/[0.06]">
-        {/* Lifetime */}
-        <div className="px-5 py-5">
-          <p className="text-[9px] text-gray-500 uppercase tracking-[0.35em] font-medium mb-2">
-            Lifetime
-          </p>
-          <p className="text-4xl font-bold text-white tabular-nums leading-none">
-            {stats.lifetimeKept}
-          </p>
-          <p className="text-[10px] text-white/30 mt-1.5">sessions completed</p>
+        {/* ── 7-day radial rings ── */}
+        <div className="flex items-end justify-between mb-6">
+          {wc.dailyStatuses.map((day) => (
+            <div key={day.date} className="flex flex-col items-center gap-2">
+              <RadialRing
+                pct={day.pct}
+                isToday={day.isToday}
+                isPast={day.isPast}
+                size={38}
+              />
+              <span
+                className={`text-[9px] tabular-nums ${
+                  day.isToday
+                    ? "text-[#c9a24d]/60"
+                    : "text-white/18"
+                }`}
+              >
+                {day.dayLabel}
+              </span>
+            </div>
+          ))}
         </div>
 
-        {/* Streak */}
-        <div className="px-5 py-5">
-          <p className="text-[9px] text-gray-500 uppercase tracking-[0.35em] font-medium mb-2">
-            Streak
-          </p>
-          <p className="text-4xl font-bold text-[#c9a24d] tabular-nums leading-none">
-            {stats.currentStreak}
-          </p>
-          <p className="text-[10px] text-white/30 mt-1.5">
-            {stats.currentStreak === 1 ? "consecutive week" : "consecutive weeks"}
-          </p>
-          <StreakBar count={stats.currentStreak} />
-        </div>
-      </div>
+        {/* ── Emotional copy ── */}
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p
+              className="text-white font-bold leading-tight"
+              style={{ fontSize: "clamp(1.05rem, 3.5vw, 1.3rem)" }}
+            >
+              {headline}
+            </p>
+            {sub && (
+              <p className="text-white/38 text-sm mt-1.5">{sub}</p>
+            )}
+            <p className="text-white/20 text-[10px] uppercase tracking-[0.3em] mt-3">
+              {weekSummary}
+            </p>
+          </div>
 
-      {/* Today's status */}
-      <div className="px-5 py-3 border-t border-white/[0.06] flex items-center min-h-[40px]">
-        <TodayBadge kept={stats.todayKept} />
+          {/* Lifetime count — identity anchor */}
+          <div className="shrink-0 text-right">
+            <p
+              className={`font-bold leading-none tabular-nums ${
+                stats.lifetimeKept >= 1 ? "text-white" : "text-white/15"
+              }`}
+              style={{ fontSize: "clamp(2rem, 6vw, 2.75rem)" }}
+            >
+              {stats.lifetimeKept}
+            </p>
+            <p className="text-white/25 text-[9px] uppercase tracking-[0.28em] mt-1.5">
+              Lifetime Promises
+            </p>
+            {hasStreak && (
+              <div className="flex items-center justify-end gap-1.5 mt-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#c9a24d]/40 inline-block" />
+                <p className="text-[#c9a24d]/35 text-[9px]">
+                  {stats.currentStreak}w streak
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

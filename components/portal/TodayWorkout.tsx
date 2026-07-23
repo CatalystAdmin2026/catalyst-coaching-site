@@ -1,12 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import WorkoutSession from "./WorkoutSession";
 import type { WorkoutSnapshot } from "./WorkoutSession";
-
-// ─────────────────────────────────────────────────────────────
-// API TYPES
-// ─────────────────────────────────────────────────────────────
 
 interface TodayWorkoutData {
   clientProgramId: string;
@@ -28,50 +25,114 @@ type TodayResult =
   | { kind: "rest_day" }
   | { kind: "no_program" }
   | { kind: "program_complete" }
-  | { kind: "not_started" };
+  | { kind: "not_started"; data: { startDate: string; daysUntilStart: number; programName: string } };
 
 type View = "today" | "active_session" | "completed";
 
 // ─────────────────────────────────────────────────────────────
-// EMPTY STATES
+// CARD SHELL — shared visual container for all states
 // ─────────────────────────────────────────────────────────────
 
-function EmptyState({ kind }: { kind: string }) {
-  const messages: Record<string, { title: string; body: string }> = {
-    rest_day: {
-      title: "Rest Day",
-      body: "Active recovery — protect your sleep, hit your protein targets, and move lightly. The adaptation happens now.",
-    },
-    no_program: {
-      title: "No Program Assigned",
-      body: "Your coach will assign your training program once your onboarding is complete. Use this time to build your foundation habits.",
-    },
-    program_complete: {
-      title: "Program Complete",
-      body: "Every session logged, every promise kept. Your coach will assign your next training block soon.",
-    },
-    not_started: {
-      title: "Program Starts Soon",
-      body: "Your training block hasn't started yet. Prepare your environment, dial in sleep and nutrition, and show up ready.",
-    },
-  };
+function HeroCard({
+  accentGold = false,
+  children,
+}: {
+  accentGold?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative bg-[#0d0e0f] border border-white/[0.07] overflow-hidden">
+      {accentGold && (
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-[#c9a24d]" aria-hidden />
+      )}
+      <div className="p-6 md:p-8">{children}</div>
+    </div>
+  );
+}
 
-  const msg = messages[kind] ?? messages.no_program;
+// ─────────────────────────────────────────────────────────────
+// REST DAY — atmospheric bedroom background
+// ─────────────────────────────────────────────────────────────
 
-  const icon =
-    kind === "rest_day" ? "○" :
-    kind === "program_complete" ? "✓" :
-    kind === "not_started" ? "◷" : "·";
+function RestDayCard() {
+  const items = [
+    "Prioritize 7–9 hours of sleep",
+    "Hydrate: 100 oz",
+    "10–15 min mobility or stretching",
+  ];
 
   return (
-    <div className="border border-white/[0.07] bg-[#0d0e0f] px-6 py-7">
-      <div className="flex items-start gap-4">
-        <div className="w-8 h-8 border border-white/[0.12] flex items-center justify-center shrink-0 mt-0.5">
-          <span className="text-gray-400 text-sm">{icon}</span>
+    <div
+      className="relative overflow-hidden bg-[#0d0e0f] border border-white/[0.07]"
+      style={{ minHeight: "380px" }}
+    >
+      {/* Atmospheric bedroom background */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: "url(/images/bedroom-bg.png)",
+          backgroundSize: "cover",
+          backgroundPosition: "center 32%",
+        }}
+      />
+      {/* Heavy gradient layering — image becomes mood, not decoration */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/65 to-black/96" />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/35 to-transparent" />
+      {/* Vignette — darkens corners, keeps center alive */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 130% 110% at 72% 38%, transparent 28%, rgba(0,0,0,0.52) 100%)",
+        }}
+      />
+
+      {/* Content layer */}
+      <div
+        className="relative z-10 p-6 md:p-8 flex flex-col"
+        style={{ minHeight: "380px" }}
+      >
+        {/* Label + heading */}
+        <div className="flex items-start gap-3 mb-4">
+          {/* Recovery icon */}
+          <div className="w-8 h-8 rounded-full bg-[#c9a24d]/12 border border-[#c9a24d]/20 flex items-center justify-center shrink-0 mt-0.5">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+                stroke="#c9a24d"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+          <div>
+            <p className="text-[9px] text-[#c9a24d]/55 uppercase tracking-[0.45em] mb-1">
+              Today
+            </p>
+            <h2
+              className="text-white font-bold leading-none"
+              style={{ fontSize: "clamp(1.75rem, 7vw, 2.75rem)" }}
+            >
+              Rest &amp; Recover.
+            </h2>
+          </div>
         </div>
-        <div>
-          <p className="text-white text-sm font-semibold mb-1">{msg.title}</p>
-          <p className="text-gray-400 text-xs leading-relaxed">{msg.body}</p>
+
+        <p className="text-white/50 text-sm leading-relaxed mb-6 max-w-xs">
+          Your body grows when you recover.<br />Make today count.
+        </p>
+
+        {/* Recovery checklist */}
+        <div className="space-y-3 flex-1">
+          {items.map((item) => (
+            <div key={item} className="flex items-center gap-3">
+              <div className="w-5 h-5 rounded-full border border-[#c9a24d]/30 flex items-center justify-center shrink-0">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#c9a24d]/45" />
+              </div>
+              <p className="text-white/55 text-sm">{item}</p>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -79,7 +140,110 @@ function EmptyState({ kind }: { kind: string }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// WORKOUT PREVIEW CARD
+// ONBOARDING STATES — direction, not absence
+// ─────────────────────────────────────────────────────────────
+
+function fmtStartDate(dateStr: string): string {
+  return new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function countdownLabel(days: number): string {
+  if (days === 1) return "1 day until your first training session.";
+  if (days < 14) return `${days} days until your first training session.`;
+  const weeks = Math.floor(days / 7);
+  return `${weeks} ${weeks === 1 ? "week" : "weeks"} until your first training session.`;
+}
+
+function OnboardingCard({
+  kind,
+  startDate,
+  daysUntilStart,
+}: {
+  kind: "no_program" | "program_complete" | "not_started";
+  startDate?: string;
+  daysUntilStart?: number;
+}) {
+  if (kind === "program_complete") {
+    return (
+      <HeroCard>
+        <p className="text-[9px] text-white/22 uppercase tracking-[0.45em] mb-5">Today</p>
+        <h2
+          className="text-white font-bold leading-none mb-4"
+          style={{ fontSize: "clamp(1.5rem, 6vw, 2.6rem)" }}
+        >
+          Program complete.
+        </h2>
+        <p className="text-white/35 text-sm leading-relaxed max-w-xs">
+          Every session logged. Your coach will assign your next block soon.
+        </p>
+      </HeroCard>
+    );
+  }
+
+  if (kind === "not_started") {
+    return (
+      <HeroCard accentGold>
+        <p className="text-[9px] text-[#c9a24d]/50 uppercase tracking-[0.45em] mb-5">
+          Today
+        </p>
+        <h2
+          className="text-white font-bold leading-none"
+          style={{ fontSize: "clamp(1.5rem, 6vw, 2.6rem)" }}
+        >
+          Your Journey Starts Soon.
+        </h2>
+        {startDate && (
+          <p className="text-[#c9a24d]/65 text-sm font-medium mt-3 mb-0.5">
+            {fmtStartDate(startDate)}
+          </p>
+        )}
+        {daysUntilStart !== undefined && daysUntilStart > 0 && (
+          <p className="text-white/30 text-xs mb-6">
+            {countdownLabel(daysUntilStart)}
+          </p>
+        )}
+        {!startDate && <div className="mb-4" />}
+        <p className="text-white/35 text-sm leading-relaxed max-w-sm mb-8">
+          The habits you build before Day 1 will shape everything that follows.
+        </p>
+        <Link
+          href="/portal/program"
+          className="inline-flex items-center gap-2 text-[#c9a24d]/75 text-xs font-semibold hover:text-[#c9a24d] transition-colors"
+        >
+          See your program
+          <span aria-hidden>→</span>
+        </Link>
+      </HeroCard>
+    );
+  }
+
+  // no_program — hero is atmospheric/informational; check-in card handles submission
+  return (
+    <HeroCard accentGold>
+      <p className="text-[9px] text-[#c9a24d]/50 uppercase tracking-[0.45em] mb-5">
+        Today
+      </p>
+      <h2
+        className="text-white font-bold leading-none mb-4"
+        style={{ fontSize: "clamp(1.5rem, 6vw, 2.6rem)" }}
+      >
+        Your first mission.
+      </h2>
+      <p className="text-white/35 text-sm leading-relaxed max-w-sm">
+        Tell your coach where you&apos;re starting from. Your starting metrics —
+        weight, energy, recovery, schedule — are how they build the right
+        program for you.
+      </p>
+    </HeroCard>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// WORKOUT CARD — the hero state
 // ─────────────────────────────────────────────────────────────
 
 function WorkoutCard({
@@ -100,6 +264,11 @@ function WorkoutCard({
   const totalSets = allExercises.reduce((s, ex) => s + (ex.sets ?? 1), 0);
   const totalExercises = allExercises.length;
 
+  const exerciseNames =
+    data.snapshot.sections.length > 0
+      ? data.snapshot.sections.flatMap((s) => s.exercises.map((e) => e.exerciseName))
+      : data.snapshot.unsectioned.map((e) => e.exerciseName);
+
   const isCompleted = data.existingSessionStatus === "completed";
   const isInProgress = data.existingSessionStatus === "in_progress";
 
@@ -117,120 +286,110 @@ function WorkoutCard({
           scheduledDate: data.scheduledDate,
         }),
       });
-      const res2 = await res.json() as { ok: boolean; session?: { id: string } };
-      if (res2.ok && res2.session) {
-        onStartWorkout();
-      }
+      const res2 = (await res.json()) as { ok: boolean; session?: { id: string } };
+      if (res2.ok && res2.session) onStartWorkout();
     } finally {
       setStarting(false);
     }
   }
 
-  return (
-    <div className="border border-white/[0.08] bg-[#0d0e0f] relative overflow-hidden">
-      {/* Subtle top accent on the primary card */}
-      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-[#c9a24d]/20 to-transparent" aria-hidden />
-
-      {/* Header */}
-      <div className="px-5 pt-5 pb-4 border-b border-white/[0.04]">
-        <div className="flex items-start justify-between gap-3">
+  if (isCompleted) {
+    return (
+      <HeroCard accentGold>
+        <p className="text-[9px] text-[#c9a24d]/50 uppercase tracking-[0.45em] mb-6">
+          {data.programName} · Week {data.weekNumber}
+        </p>
+        <div className="flex items-start gap-4">
+          <div className="w-8 h-8 border border-emerald-500/30 bg-emerald-500/[0.08] flex items-center justify-center shrink-0">
+            <span className="text-emerald-400 text-sm">✓</span>
+          </div>
           <div>
-            <p className="text-[9px] text-gray-500 uppercase tracking-[0.4em] mb-1">
-              {data.programName} · Week {data.weekNumber}/{data.totalWeeks}
+            <p className="text-white text-lg font-semibold leading-snug">
+              Session logged. You showed up.
             </p>
-            <h3 className="text-white text-lg font-bold tracking-wide leading-snug">
-              {data.workoutName}
-            </h3>
+            <p className="text-white/30 text-sm mt-1">{data.workoutName}</p>
           </div>
-          {data.estimatedDurationMinutes && (
-            <div className="shrink-0 text-right">
-              <p className="text-[#C9A24D] text-xl font-bold tabular-nums leading-none">
-                {data.estimatedDurationMinutes}
-              </p>
-              <p className="text-gray-500 text-[9px] uppercase tracking-[0.3em] mt-0.5">min</p>
-            </div>
-          )}
         </div>
+        <p className="text-white/18 text-xs leading-relaxed max-w-xs mt-5">
+          Rest up, hit your targets, and come back stronger.
+        </p>
+      </HeroCard>
+    );
+  }
 
-        <div className="flex items-center gap-3 mt-2.5 text-gray-500 text-[10px]">
-          <span>{totalExercises} exercise{totalExercises !== 1 ? "s" : ""}</span>
-          <span>·</span>
-          <span>{totalSets} sets</span>
-          {data.snapshot.sections.length > 0 && (
-            <>
-              <span>·</span>
-              <span>{data.snapshot.sections.length} blocks</span>
-            </>
-          )}
-        </div>
-      </div>
+  return (
+    <HeroCard accentGold>
+      {/* Program context — muted, subordinate */}
+      <p className="text-[9px] text-white/22 uppercase tracking-[0.42em] mb-4">
+        {data.programName}&nbsp;·&nbsp;Week {data.weekNumber}/{data.totalWeeks}
+        {data.estimatedDurationMinutes ? ` · ${data.estimatedDurationMinutes} min` : ""}
+      </p>
 
-      {/* Exercise preview */}
-      <div className="px-5 py-3 border-b border-white/[0.04] space-y-1.5">
-        {data.snapshot.sections.slice(0, 4).map((sec) => (
-          <div key={sec.id} className="flex items-start gap-3">
-            <span className="text-gray-600 text-[9px] uppercase tracking-[0.3em] w-20 shrink-0 pt-px">
-              {sec.name}
-            </span>
-            <span className="text-gray-400 text-[10px] leading-relaxed">
-              {sec.exercises.map((e) => e.exerciseName).join(", ")}
-            </span>
-          </div>
-        ))}
-        {data.snapshot.unsectioned.length > 0 && data.snapshot.sections.length === 0 && (
-          <div className="flex items-start gap-3">
-            <span className="text-gray-600 text-[9px] uppercase tracking-[0.3em] w-20 shrink-0 pt-px">
-              Exercises
-            </span>
-            <span className="text-gray-400 text-[10px] leading-relaxed">
-              {data.snapshot.unsectioned.map((e) => e.exerciseName).join(", ")}
-            </span>
-          </div>
-        )}
-        {data.snapshot.sections.length > 4 && (
-          <p className="text-gray-600 text-[10px]">
-            +{data.snapshot.sections.length - 4} more blocks
-          </p>
-        )}
-      </div>
+      {/* Workout name — the dominant anchor */}
+      <h2
+        className="text-white font-bold leading-none mb-4"
+        style={{ fontSize: "clamp(2.5rem, 10vw, 4.5rem)" }}
+      >
+        {data.workoutName}
+      </h2>
 
-      {/* Action */}
-      <div className="px-5 py-4">
-        {isCompleted ? (
-          <div className="flex items-center gap-2.5">
-            <div className="w-5 h-5 border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-center shrink-0">
-              <span className="text-emerald-400 text-[9px]">✓</span>
-            </div>
-            <span className="text-emerald-400 text-xs font-semibold tracking-wide">
-              Promise kept — session logged
-            </span>
-          </div>
-        ) : isInProgress && data.existingSessionId ? (
-          <button
-            onClick={() => onResumeWorkout(data.existingSessionId!)}
-            className="w-full bg-[#C9A24D]/15 border border-[#C9A24D]/25 text-[#C9A24D] font-bold text-[10px] tracking-[0.3em] uppercase py-3.5 hover:bg-[#C9A24D]/25 transition-colors"
-          >
-            Resume Workout
-          </button>
-        ) : (
-          <button
-            onClick={handleStart}
-            disabled={starting}
-            className="w-full bg-[#C9A24D] text-black font-bold text-[11px] tracking-[0.3em] uppercase py-3.5 hover:bg-[#d4af63] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {starting ? "Starting…" : "Start Workout"}
-          </button>
-        )}
-      </div>
+      {/* Volume — muted but present */}
+      <p className="text-white/20 text-[10px] tabular-nums mb-4">
+        {totalExercises} exercise{totalExercises !== 1 ? "s" : ""}&nbsp;·&nbsp;
+        {totalSets} sets
+      </p>
+
+      {/* Exercise preview — flowing text */}
+      {exerciseNames.length > 0 && (
+        <p className="text-white/22 text-xs leading-relaxed mb-7">
+          {exerciseNames.slice(0, 10).join(" · ")}
+          {exerciseNames.length > 10 && ` +${exerciseNames.length - 10}`}
+        </p>
+      )}
+
+      {/* CTA — full-width, commanding */}
+      {isInProgress && data.existingSessionId ? (
+        <button
+          onClick={() => onResumeWorkout(data.existingSessionId!)}
+          className="w-full border border-[#c9a24d]/40 text-[#c9a24d] text-[11px] font-bold uppercase tracking-[0.3em] py-5 hover:bg-[#c9a24d]/10 transition-colors"
+        >
+          Resume Workout
+        </button>
+      ) : (
+        <button
+          onClick={handleStart}
+          disabled={starting}
+          className="w-full bg-[#c9a24d] text-black text-[11px] font-bold uppercase tracking-[0.35em] py-5 hover:bg-[#d4af63] disabled:opacity-50 transition-colors"
+        >
+          {starting ? "Starting…" : "Keep This Promise"}
+        </button>
+      )}
+    </HeroCard>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// LOADING SKELETON
+// ─────────────────────────────────────────────────────────────
+
+function LoadingSkeleton() {
+  return (
+    <div className="bg-[#0d0e0f] border border-white/[0.07] p-6 md:p-8">
+      <div className="h-2 bg-white/[0.04] animate-pulse w-1/3 mb-6 rounded-sm" />
+      <div className="h-14 bg-white/[0.06] animate-pulse w-5/6 mb-4 rounded-sm" />
+      <div className="h-2 bg-white/[0.03] animate-pulse w-1/4 mb-4 rounded-sm" />
+      <div className="h-2 bg-white/[0.03] animate-pulse w-full mb-1 rounded-sm" />
+      <div className="h-2 bg-white/[0.03] animate-pulse w-3/4 mb-8 rounded-sm" />
+      <div className="h-14 bg-white/[0.05] animate-pulse w-full rounded-sm" />
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────
-// MAIN TODAY WORKOUT COMPONENT
+// MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────
 
-export default function TodayWorkout() {
+export default function TodayWorkout({ devPreviewState }: { devPreviewState?: string }) {
   const [result, setResult] = useState<TodayResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>("today");
@@ -239,6 +398,30 @@ export default function TodayWorkout() {
   const [workoutName, setWorkoutName] = useState<string | null>(null);
 
   useEffect(() => {
+    // Dev-only: bypass API and render preview state directly
+    if (devPreviewState && process.env.NODE_ENV === "development") {
+      if (devPreviewState === "rest_day") {
+        setResult({ kind: "rest_day" });
+      } else if (devPreviewState === "not_started") {
+        const futureDate = new Date();
+        futureDate.setUTCDate(futureDate.getUTCDate() + 14);
+        setResult({
+          kind: "not_started",
+          data: {
+            startDate: futureDate.toISOString().slice(0, 10),
+            daysUntilStart: 14,
+            programName: "Foundation Program",
+          },
+        });
+      } else if (devPreviewState === "no_program") {
+        setResult({ kind: "no_program" });
+      } else if (devPreviewState === "program_complete") {
+        setResult({ kind: "program_complete" });
+      }
+      setLoading(false);
+      return;
+    }
+
     let mounted = true;
     fetch("/api/portal/today-workout")
       .then((r) => r.json())
@@ -247,43 +430,26 @@ export default function TodayWorkout() {
         if (data.ok && data.result) setResult(data.result);
         setLoading(false);
       })
-      .catch(() => { if (mounted) setLoading(false); });
-    return () => { mounted = false; };
-  }, []);
+      .catch(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [devPreviewState]);
 
-  if (loading) {
+  if (loading) return <LoadingSkeleton />;
+
+  if (!result || result.kind === "rest_day") return <RestDayCard />;
+
+  if (result.kind !== "workout") {
     return (
-      <div className="border border-white/[0.07] bg-[#0d0e0f]">
-        <div className="px-5 pt-5 pb-4 border-b border-white/[0.04]">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="h-2 bg-white/[0.05] animate-pulse w-2/5 mb-3 rounded-sm" />
-              <div className="h-5 bg-white/[0.07] animate-pulse w-3/4 mb-3 rounded-sm" />
-              <div className="flex gap-3">
-                <div className="h-2 bg-white/[0.04] animate-pulse w-20 rounded-sm" />
-                <div className="h-2 bg-white/[0.04] animate-pulse w-16 rounded-sm" />
-              </div>
-            </div>
-            <div className="h-9 w-10 bg-white/[0.04] animate-pulse shrink-0 rounded-sm" />
-          </div>
-        </div>
-        <div className="px-5 py-3 border-b border-white/[0.04] space-y-2.5">
-          {([55, 75, 45] as const).map((w, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <div className="h-2 bg-white/[0.04] animate-pulse w-16 shrink-0 rounded-sm" />
-              <div className="h-2 bg-white/[0.04] animate-pulse flex-1 rounded-sm" style={{ maxWidth: `${w}%` }} />
-            </div>
-          ))}
-        </div>
-        <div className="px-5 py-4">
-          <div className="h-12 bg-white/[0.04] animate-pulse rounded-sm" />
-        </div>
-      </div>
+      <OnboardingCard
+        kind={result.kind}
+        startDate={result.kind === "not_started" ? result.data.startDate : undefined}
+        daysUntilStart={result.kind === "not_started" ? result.data.daysUntilStart : undefined}
+      />
     );
-  }
-
-  if (!result || result.kind !== "workout") {
-    return <EmptyState kind={result?.kind ?? "no_program"} />;
   }
 
   const todayData = result.data;
@@ -309,25 +475,32 @@ export default function TodayWorkout() {
 
   if (view === "completed") {
     return (
-      <div className="border border-emerald-500/15 bg-emerald-500/[0.03] px-6 py-8 text-center">
-        <div className="w-10 h-10 border border-emerald-500/25 bg-emerald-500/10 flex items-center justify-center mx-auto mb-5">
-          <span className="text-emerald-400 text-base">✓</span>
+      <HeroCard accentGold>
+        <p className="text-[9px] text-[#c9a24d]/50 uppercase tracking-[0.45em] mb-6">
+          Today
+        </p>
+        <div className="flex items-start gap-4 mb-5">
+          <div className="w-8 h-8 border border-emerald-500/30 bg-emerald-500/[0.08] flex items-center justify-center shrink-0">
+            <span className="text-emerald-400 text-sm">✓</span>
+          </div>
+          <div>
+            <p className="text-white text-lg font-semibold leading-snug">
+              Session logged. You showed up.
+            </p>
+            <p className="text-white/30 text-sm mt-1">
+              {workoutName ?? todayData.workoutName}
+            </p>
+          </div>
+          {completionPct !== null && (
+            <p className="text-[#c9a24d] font-bold text-2xl tabular-nums ml-auto mt-0.5">
+              {completionPct}%
+            </p>
+          )}
         </div>
-        <h3 className="text-white text-base font-bold tracking-wide mb-0.5">
-          Promise Kept
-        </h3>
-        <p className="text-gray-500 text-sm mb-3">
-          {workoutName ?? todayData.workoutName}
+        <p className="text-white/22 text-xs leading-relaxed max-w-xs">
+          Rest up, hit your targets, and come back stronger.
         </p>
-        {completionPct !== null && (
-          <p className="text-[#C9A24D] font-bold text-2xl tabular-nums mb-3">
-            {completionPct}%
-          </p>
-        )}
-        <p className="text-gray-600 text-xs max-w-xs mx-auto leading-relaxed">
-          Session recorded. Rest up, hit your targets, and come back stronger.
-        </p>
-      </div>
+      </HeroCard>
     );
   }
 

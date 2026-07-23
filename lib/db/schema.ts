@@ -676,6 +676,46 @@ export type NewProgramTemplate = typeof programTemplates.$inferInsert;
 export type WorkoutTemplate = typeof workoutTemplates.$inferSelect;
 export type NewWorkoutTemplate = typeof workoutTemplates.$inferInsert;
 
+// ─────────────────────────────────────────────────────────────
+// TABLE — client_milestone_acknowledgements
+//
+// Records when a client has seen the unlock animation for a
+// newly-earned Coaching Milestone. Replaces the localStorage
+// approach so acknowledgement is account-scoped, not browser-scoped.
+//
+// milestone_key is the stable string ID of the Achievement
+// (e.g. "first-check-in", "4-week-standard"). These IDs are
+// defined in getClientAchievements() and must not be renamed
+// without a backfill migration.
+//
+// The UNIQUE constraint on (client_id, milestone_key) makes
+// acknowledgement idempotent — INSERT ON CONFLICT DO NOTHING
+// is safe to call from the client after each animation.
+// ─────────────────────────────────────────────────────────────
+
+export const clientMilestoneAcknowledgements = pgTable(
+  "client_milestone_acknowledgements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clientId: uuid("client_id")
+      .notNull()
+      .references((): AnyPgColumn => users.id, { onDelete: "cascade" }),
+    milestoneKey: text("milestone_key").notNull(),
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("uq_client_milestone").on(table.clientId, table.milestoneKey),
+    index("idx_milestone_ack_client_id").on(table.clientId),
+  ],
+);
+
+export type ClientMilestoneAcknowledgement =
+  typeof clientMilestoneAcknowledgements.$inferSelect;
+export type NewClientMilestoneAcknowledgement =
+  typeof clientMilestoneAcknowledgements.$inferInsert;
+
 // Enum value types — useful for type-safe function parameters
 export type UserRole = (typeof userRoleEnum.enumValues)[number];
 export type UserStatus = (typeof userStatusEnum.enumValues)[number];

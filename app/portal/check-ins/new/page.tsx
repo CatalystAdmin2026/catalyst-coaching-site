@@ -13,7 +13,9 @@ import { requireClientUser, getClientProfile } from "@/lib/supabase/session";
 import {
   getCurrentCheckInWindow,
   getClientCheckInDetail,
+  getPreviousCheckIn,
 } from "@/lib/db/check-in-service";
+import type { PreviousCheckInContext } from "@/components/portal/CheckInForm";
 import PortalShell from "@/components/portal/PortalShell";
 import CheckInForm from "@/components/portal/CheckInForm";
 
@@ -38,10 +40,16 @@ export default async function NewCheckInPage() {
     redirect(`/portal/check-ins/${existingCheckIn.id}`);
   }
 
-  // Load draft data if one exists
-  const draft = existingCheckIn?.id
-    ? await getClientCheckInDetail(dbUser.id, existingCheckIn.id)
-    : null;
+  // Load draft data and previous reviewed check-in in parallel.
+  // Previous check-in data is shown as lightweight context alongside
+  // form fields so clients can reflect on last week's values while
+  // filling in this week's check-in.
+  const [draft, prevCheckIn] = await Promise.all([
+    existingCheckIn?.id
+      ? getClientCheckInDetail(dbUser.id, existingCheckIn.id)
+      : Promise.resolve(null),
+    getPreviousCheckIn(dbUser.id, window_.weekStartDate),
+  ]);
 
   const initialData = draft
     ? {
@@ -62,6 +70,22 @@ export default async function NewCheckInPage() {
         clientNotes: draft.clientNotes ?? "",
       }
     : undefined;
+
+  const previousCheckIn: PreviousCheckInContext | null = prevCheckIn
+    ? {
+        bodyWeightLbs: prevCheckIn.bodyWeightLbs,
+        waistInches: prevCheckIn.waistInches,
+        averageSleepHours: prevCheckIn.averageSleepHours,
+        averageStress: prevCheckIn.averageStress,
+        averageEnergy: prevCheckIn.averageEnergy,
+        averageHunger: prevCheckIn.averageHunger,
+        digestionRating: prevCheckIn.digestionRating,
+        averageWaterOunces: prevCheckIn.averageWaterOunces,
+        averageSteps: prevCheckIn.averageSteps,
+        workoutCompliancePct: prevCheckIn.workoutCompliancePct,
+        nutritionCompliancePct: prevCheckIn.nutritionCompliancePct,
+      }
+    : null;
 
   return (
     <PortalShell clientName={clientName}>
@@ -85,6 +109,7 @@ export default async function NewCheckInPage() {
           initialData={initialData}
           existingCheckInId={existingCheckIn?.id}
           weekStartDate={window_.weekStartDate}
+          previousCheckIn={previousCheckIn}
         />
       </div>
     </PortalShell>

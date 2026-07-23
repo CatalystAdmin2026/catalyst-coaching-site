@@ -13,7 +13,13 @@ import "server-only";
 import { eq, and, desc, asc, inArray, isNotNull } from "drizzle-orm";
 import { getDb } from "./client";
 import { users, programTemplates, workoutTemplates, timelineEvents as timelineEventsTable } from "./schema";
-import { clientPrograms, programWeeks, programWeekDays } from "./schema-program";
+import {
+  clientPrograms,
+  clientProgramWeeks,
+  clientProgramWeekDays,
+  programWeeks,
+  programWeekDays,
+} from "./schema-program";
 
 // ─────────────────────────────────────────────────────────────
 // SHAPES
@@ -233,10 +239,14 @@ export async function archiveAndAssignProgram({
   }
 
   // Pre-validate: template must be published.
-  // Done outside the transaction so tmpl.name is available for the
-  // timeline event title without an extra query inside the tx.
+  // Fetch name + version here so the lineage snapshot is populated on the
+  // new client_programs row without an extra query inside the transaction.
   const [tmpl] = await db
-    .select({ name: programTemplates.name, status: programTemplates.status })
+    .select({
+      name: programTemplates.name,
+      status: programTemplates.status,
+      version: programTemplates.version,
+    })
     .from(programTemplates)
     .where(eq(programTemplates.id, programTemplateId))
     .limit(1);
@@ -249,10 +259,41 @@ export async function archiveAndAssignProgram({
     };
   }
 
-  // Archive existing program + create new one atomically.
-  // If the INSERT fails (e.g. template unpublished mid-flight, or a
-  // concurrent assignment race hits uq_client_active_program), the
-  // UPDATE that cancelled the old program is rolled back automatically.
+  // Fetch template structure outside the transaction — read-only, no locking needed.
+  const templateWeeks = await db
+    .select({
+      id: programWeeks.id,
+      weekNumber: programWeeks.weekNumber,
+      label: programWeeks.label,
+      notes: programWeeks.notes,
+    })
+    .from(programWeeks)
+    .where(eq(programWeeks.programTemplateId, programTemplateId))
+    .orderBy(asc(programWeeks.weekNumber));
+
+  const templateDays =
+    templateWeeks.length > 0
+      ? await db
+          .select({
+            id: programWeekDays.id,
+            programWeekId: programWeekDays.programWeekId,
+            dayOfWeek: programWeekDays.dayOfWeek,
+            workoutTemplateId: programWeekDays.workoutTemplateId,
+            label: programWeekDays.label,
+            notes: programWeekDays.notes,
+          })
+          .from(programWeekDays)
+          .where(
+            inArray(
+              programWeekDays.programWeekId,
+              templateWeeks.map((w) => w.id),
+            ),
+          )
+      : [];
+
+  // Archive existing program + create new one + deep-copy structure atomically.
+  // If any step fails the entire transaction rolls back — the client is never
+  // left with a client_programs row and no structural week data.
   try {
     const assignmentId = await db.transaction(async (tx) => {
       // Lock & archive any existing active program.
@@ -274,7 +315,7 @@ export async function archiveAndAssignProgram({
           .where(eq(clientPrograms.id, existing.id));
       }
 
-      // Insert the new active assignment.
+      // Insert the new active assignment with lineage snapshot.
       const [newAssignment] = await tx
         .insert(clientPrograms)
         .values({
@@ -284,8 +325,40 @@ export async function archiveAndAssignProgram({
           coachNotes: coachNotes ?? null,
           overrideAllowMultiple: false,
           status: "active",
+          sourceTemplateName: tmpl.name,
+          sourceTemplateVersion: tmpl.version,
         })
         .returning({ id: clientPrograms.id });
+
+      // Deep-copy scheduling structure into client-owned rows.
+      for (const week of templateWeeks) {
+        const [newWeek] = await tx
+          .insert(clientProgramWeeks)
+          .values({
+            clientProgramId: newAssignment.id,
+            sourceWeekId: week.id,
+            weekNumber: week.weekNumber,
+            label: week.label,
+            notes: week.notes,
+          })
+          .returning({ id: clientProgramWeeks.id });
+
+        const daysForWeek = templateDays.filter(
+          (d) => d.programWeekId === week.id,
+        );
+        if (daysForWeek.length > 0) {
+          await tx.insert(clientProgramWeekDays).values(
+            daysForWeek.map((d) => ({
+              clientProgramWeekId: newWeek.id,
+              sourceDayId: d.id,
+              dayOfWeek: d.dayOfWeek,
+              workoutTemplateId: d.workoutTemplateId,
+              label: d.label,
+              notes: d.notes,
+            })),
+          );
+        }
+      }
 
       // Record timeline event.
       await tx.insert(timelineEventsTable).values({

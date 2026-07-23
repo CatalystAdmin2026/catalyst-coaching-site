@@ -10,6 +10,27 @@
 import "server-only";
 import { eq, asc, inArray, sql } from "drizzle-orm";
 import { getDb } from "./client";
+
+// Atomically increments program_templates.version for the given template ID.
+// Called by every function that mutates template structure so that clients
+// assigned from a previous version can be identified by future sync workflows.
+async function bumpTemplateVersion(templateId: string): Promise<void> {
+  const db = getDb();
+  await db
+    .update(programTemplates)
+    .set({ version: sql`${programTemplates.version} + 1`, updatedAt: new Date() })
+    .where(eq(programTemplates.id, templateId));
+}
+
+async function getTemplateIdForWeek(weekId: string): Promise<string | null> {
+  const db = getDb();
+  const [row] = await db
+    .select({ programTemplateId: programWeeks.programTemplateId })
+    .from(programWeeks)
+    .where(eq(programWeeks.id, weekId))
+    .limit(1);
+  return row?.programTemplateId ?? null;
+}
 import {
   programTemplates,
   workoutTemplates,
@@ -146,19 +167,42 @@ export async function updateProgramTemplate(
   const updates: Record<string, unknown> = {
     updatedAt: new Date(),
   };
+
+  // Track whether any structural content is changing (not just status).
+  // Version is only bumped for content changes so that publish/unpublish
+  // transitions don't generate spurious "template updated" signals.
+  let structuralChange = false;
+
   if (data.name !== undefined) {
     updates.name = data.name;
     updates.slug = slugify(data.name);
+    structuralChange = true;
   }
-  if (data.description !== undefined) updates.description = data.description;
-  if (data.category !== undefined) updates.category = data.category;
-  if (data.experienceLevel !== undefined)
+  if (data.description !== undefined) {
+    updates.description = data.description;
+    structuralChange = true;
+  }
+  if (data.category !== undefined) {
+    updates.category = data.category;
+    structuralChange = true;
+  }
+  if (data.experienceLevel !== undefined) {
     updates.experienceLevel = data.experienceLevel;
-  if (data.recommendedDaysPerWeek !== undefined)
+    structuralChange = true;
+  }
+  if (data.recommendedDaysPerWeek !== undefined) {
     updates.recommendedDaysPerWeek = data.recommendedDaysPerWeek;
-  if (data.defaultDurationWeeks !== undefined)
+    structuralChange = true;
+  }
+  if (data.defaultDurationWeeks !== undefined) {
     updates.defaultDurationWeeks = data.defaultDurationWeeks;
+    structuralChange = true;
+  }
   if (data.status !== undefined) updates.status = data.status;
+
+  if (structuralChange) {
+    updates.version = sql`${programTemplates.version} + 1`;
+  }
 
   const [row] = await db
     .update(programTemplates)
@@ -309,6 +353,7 @@ export async function addProgramWeek(
     })
     .returning();
 
+  await bumpTemplateVersion(programId);
   return row;
 }
 
@@ -326,15 +371,20 @@ export async function updateProgramWeek(
     })
     .where(eq(programWeeks.id, weekId))
     .returning();
+
+  const templateId = await getTemplateIdForWeek(weekId);
+  if (templateId) await bumpTemplateVersion(templateId);
   return row;
 }
 
 export async function deleteProgramWeek(weekId: string): Promise<void> {
   const db = getDb();
+  const templateId = await getTemplateIdForWeek(weekId);
   await db
     .delete(programWeekDays)
     .where(eq(programWeekDays.programWeekId, weekId));
   await db.delete(programWeeks).where(eq(programWeeks.id, weekId));
+  if (templateId) await bumpTemplateVersion(templateId);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -359,8 +409,9 @@ export async function setDayWorkout(
     )
     .limit(1);
 
+  let row: ProgramWeekDay;
   if (existing[0]) {
-    const [row] = await db
+    [row] = await db
       .update(programWeekDays)
       .set({
         workoutTemplateId,
@@ -370,29 +421,33 @@ export async function setDayWorkout(
       })
       .where(eq(programWeekDays.id, existing[0].id))
       .returning();
-    return row;
+  } else {
+    [row] = await db
+      .insert(programWeekDays)
+      .values({
+        programWeekId: weekId,
+        dayOfWeek,
+        workoutTemplateId,
+        label: label ?? null,
+        notes: notes ?? null,
+      })
+      .returning();
   }
 
-  const [row] = await db
-    .insert(programWeekDays)
-    .values({
-      programWeekId: weekId,
-      dayOfWeek,
-      workoutTemplateId,
-      label: label ?? null,
-      notes: notes ?? null,
-    })
-    .returning();
+  const templateId = await getTemplateIdForWeek(weekId);
+  if (templateId) await bumpTemplateVersion(templateId);
   return row;
 }
 
 export async function clearDayWorkout(weekId: string, dayOfWeek: number): Promise<void> {
   const db = getDb();
+  const templateId = await getTemplateIdForWeek(weekId);
   await db
     .delete(programWeekDays)
     .where(
       sql`${programWeekDays.programWeekId} = ${weekId} AND ${programWeekDays.dayOfWeek} = ${dayOfWeek}`,
     );
+  if (templateId) await bumpTemplateVersion(templateId);
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -1,10 +1,3 @@
-// ─────────────────────────────────────────────────────────────
-// Catalyst Portal — Check-Ins List
-//
-// Server Component. Shows current week status and check-in history.
-// Auth: portal layout (requireClientUser) + role guard below.
-// ─────────────────────────────────────────────────────────────
-
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireClientUser, getClientProfile } from "@/lib/supabase/session";
@@ -24,17 +17,16 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const STATUS_COLOR: Record<string, string> = {
-  draft: "text-gray-400 border-gray-600/40",
-  submitted: "text-blue-400 border-blue-500/30",
-  in_review: "text-amber-400 border-amber-500/30",
-  reviewed: "text-emerald-400 border-emerald-500/30",
+  draft: "text-white/30 border-white/10",
+  submitted: "text-blue-400/70 border-blue-500/20",
+  in_review: "text-amber-400/70 border-amber-500/20",
+  reviewed: "text-emerald-400/70 border-emerald-500/20",
 };
 
 function fmtWeek(dateStr: string): string {
   return new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", {
-    month: "short",
+    month: "long",
     day: "numeric",
-    year: "numeric",
   });
 }
 
@@ -51,8 +43,7 @@ export default async function CheckInsPage() {
   if (dbUser.role !== "client") redirect("/admin");
 
   const profile = await getClientProfile(dbUser.id);
-  const clientName =
-    profile?.preferredName ?? profile?.fullName ?? "Client";
+  const clientName = profile?.preferredName ?? profile?.fullName ?? "Client";
 
   const [window_, history] = await Promise.all([
     getCurrentCheckInWindow(dbUser.id),
@@ -64,13 +55,14 @@ export default async function CheckInsPage() {
     (c) => c.weekStartDate < window_.weekStartDate,
   );
 
-  // Due date display
-  const dueDateLabel = new Date(window_.dueDate + "T12:00:00").toLocaleDateString(
-    "en-US",
-    { weekday: "long", month: "short", day: "numeric" },
-  );
+  const dueDateLabel = new Date(
+    window_.dueDate + "T12:00:00",
+  ).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
 
-  // Next check-in window opens the Sunday after the current week ends
   const nextWeekStart = new Date(window_.weekEndDate + "T12:00:00");
   nextWeekStart.setDate(nextWeekStart.getDate() + 1);
   const nextCheckInLabel = nextWeekStart.toLocaleDateString("en-US", {
@@ -79,175 +71,211 @@ export default async function CheckInsPage() {
     day: "numeric",
   });
 
+  // Determine the primary state — coach response is the most important
+  const coachHasResponded =
+    currentWeekCheckIn?.hasCoachResponse === true &&
+    (currentWeekCheckIn.status === "reviewed" ||
+      currentWeekCheckIn.status === "in_review");
+
   return (
     <PortalShell clientName={clientName}>
-      <div className="space-y-8">
-        {/* Page header */}
-        <div>
-          <h1 className="text-white text-xl font-bold tracking-wide">
-            Weekly Check-Ins
-          </h1>
-          <p className="text-gray-400 text-sm mt-1">
-            One honest check-in per week keeps your coach in your corner.
-          </p>
-        </div>
 
-        {/* Current week card */}
-        <section>
-          <p className="text-[9px] text-gray-500 uppercase tracking-[0.4em] mb-3">
-            This Week
-          </p>
+      {/* ── CURRENT WEEK — one dominant state, zero ambiguity ── */}
+      <section aria-label="This week's check-in">
 
-          {!currentWeekCheckIn ? (
-            // Not started
-            <div className="bg-[#0d0e0f] border border-white/[0.06] px-5 py-5 relative overflow-hidden">
-              <div className="h-px absolute top-0 inset-x-0 bg-gradient-to-r from-transparent via-[#C9A24D]/15 to-transparent" />
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-white font-semibold">
-                    Week of {fmtWeek(window_.weekStartDate)}
-                  </p>
-                  <p className="text-gray-500 text-xs mt-1">
-                    Due {dueDateLabel}
-                    {window_.isOverdue && (
-                      <span className="ml-2 text-amber-400">· Overdue</span>
-                    )}
-                  </p>
-                </div>
-                <Link
-                  href="/portal/check-ins/new"
-                  className="shrink-0 bg-[#C9A24D] text-black text-[10px] font-bold uppercase tracking-[0.2em] px-4 py-2 hover:bg-[#d4af63] transition-colors"
-                >
-                  Start Check-In
-                </Link>
-              </div>
-            </div>
-          ) : currentWeekCheckIn.status === "draft" ? (
-            // Draft in progress
-            <div className="bg-[#0d0e0f] border border-white/[0.06] px-5 py-5 relative overflow-hidden">
-              <div className="h-px absolute top-0 inset-x-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[9px] text-gray-500 border border-gray-600/40 px-1.5 py-0.5 uppercase tracking-[0.2em]">
-                      Draft saved
-                    </span>
-                  </div>
-                  <p className="text-white font-semibold">
-                    Week of {fmtWeek(window_.weekStartDate)}
-                  </p>
-                  <p className="text-gray-500 text-xs mt-1">
-                    Due {dueDateLabel}
-                    {window_.isOverdue && (
-                      <span className="ml-2 text-amber-400">· Overdue</span>
-                    )}
-                  </p>
-                </div>
-                <Link
-                  href="/portal/check-ins/new"
-                  className="shrink-0 text-[10px] text-[#C9A24D] border border-[#C9A24D]/25 font-bold uppercase tracking-[0.2em] px-4 py-2 hover:bg-[#C9A24D]/10 transition-colors"
-                >
-                  Continue
-                </Link>
-              </div>
-            </div>
-          ) : (
-            // Submitted / in_review / reviewed — check-in is complete for this week
-            <div className="bg-[#0d0e0f] border border-white/[0.06] px-5 py-5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <p className="text-white font-semibold mb-1">
-                    This week&apos;s check-in is complete
-                  </p>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span
-                      className={`text-[9px] border px-1.5 py-0.5 uppercase tracking-[0.2em] ${STATUS_COLOR[currentWeekCheckIn.status]}`}
-                    >
-                      {STATUS_LABEL[currentWeekCheckIn.status]}
-                    </span>
-                    {currentWeekCheckIn.hasCoachResponse && (
-                      <span className="text-[9px] text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 uppercase tracking-[0.2em]">
-                        Response ready
-                      </span>
-                    )}
-                  </div>
-                  {currentWeekCheckIn.submittedAt && (
-                    <p className="text-gray-500 text-xs">
-                      Submitted {fmtDate(currentWeekCheckIn.submittedAt)}
-                    </p>
-                  )}
-                  <p className="text-gray-600 text-[10px] mt-0.5">
-                    Next check-in opens {nextCheckInLabel}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-2 shrink-0">
-                  <Link
-                    href={`/portal/check-ins/${currentWeekCheckIn.id}`}
-                    className="text-[10px] text-gray-400 hover:text-white border border-white/[0.08] hover:border-white/[0.18] px-3 py-1.5 uppercase tracking-[0.15em] transition-colors"
-                  >
-                    View →
-                  </Link>
-                  {currentWeekCheckIn.status === "submitted" && (
-                    <Link
-                      href={`/portal/check-ins/${currentWeekCheckIn.id}/edit`}
-                      className="text-[10px] text-[#C9A24D]/70 hover:text-[#C9A24D] border border-[#C9A24D]/20 hover:border-[#C9A24D]/40 px-3 py-1.5 uppercase tracking-[0.15em] transition-colors"
-                    >
-                      Edit
-                    </Link>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </section>
-
-        {/* History */}
-        {pastCheckIns.length > 0 && (
-          <section>
-            <p className="text-[9px] text-gray-500 uppercase tracking-[0.4em] mb-3">
-              History
+        {coachHasResponded && currentWeekCheckIn ? (
+          /* ── COACH RESPONDED — the highest-priority state ─────────
+             This is the variable reward that brings athletes back.
+             It must dominate the page completely.
+          ── */
+          <div>
+            <p className="text-[9px] text-white/22 uppercase tracking-[0.45em] mb-4">
+              Check-Ins
             </p>
-            <div className="space-y-1.5">
-              {pastCheckIns.map((c) => (
-                <Link
-                  key={c.id}
-                  href={`/portal/check-ins/${c.id}`}
-                  className="bg-[#0d0e0f] border border-white/[0.05] px-4 py-3 flex items-center gap-4 hover:border-white/[0.10] hover:bg-[#101213] transition-colors block"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white text-sm">
-                      Week of {fmtWeek(c.weekStartDate)}
-                    </p>
-                    {c.submittedAt && (
-                      <p className="text-gray-600 text-[10px]">
-                        Submitted {fmtDate(c.submittedAt)}
-                      </p>
-                    )}
-                  </div>
-                  <span
-                    className={`text-[9px] border px-1.5 py-0.5 uppercase tracking-[0.2em] shrink-0 ${STATUS_COLOR[c.status]}`}
-                  >
-                    {STATUS_LABEL[c.status]}
-                  </span>
-                  {c.hasCoachResponse && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                  )}
-                  <span className="text-gray-600 text-xs shrink-0">→</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {history.length === 0 && !currentWeekCheckIn && (
-          <div className="border border-dashed border-white/[0.06] px-5 py-8 text-center">
-            <p className="text-gray-500 text-sm">No check-ins yet.</p>
-            <p className="text-gray-600 text-xs mt-1">
-              Your check-in history will appear here once you submit your first one.
+            <h1
+              className="text-white font-bold leading-tight mb-2"
+              style={{ fontSize: "clamp(1.75rem, 5vw, 2.5rem)" }}
+            >
+              Your coach left feedback.
+            </h1>
+            <p className="text-white/35 text-sm mb-8">
+              Week of {fmtWeek(window_.weekStartDate)}
             </p>
+            <Link
+              href={`/portal/check-ins/${currentWeekCheckIn.id}`}
+              className="inline-block bg-[#c9a24d] text-black text-[11px] font-bold uppercase tracking-[0.3em] px-8 py-4 hover:bg-[#d4af63] transition-colors"
+            >
+              Read Feedback
+            </Link>
+            {currentWeekCheckIn.status === "submitted" && (
+              <Link
+                href={`/portal/check-ins/${currentWeekCheckIn.id}/edit`}
+                className="inline-block ml-4 text-[10px] text-white/30 hover:text-white/60 uppercase tracking-[0.2em] transition-colors"
+              >
+                Edit
+              </Link>
+            )}
+          </div>
+        ) : !currentWeekCheckIn ? (
+          /* ── NOT STARTED — coach is waiting ── */
+          <div>
+            <p className="text-[9px] text-white/22 uppercase tracking-[0.45em] mb-4">
+              Check-Ins
+            </p>
+            <h1
+              className="text-white font-bold leading-tight mb-2"
+              style={{ fontSize: "clamp(1.75rem, 5vw, 2.5rem)" }}
+            >
+              Your coach is waiting.
+            </h1>
+            <p className="text-white/35 text-sm mb-1">
+              Week of {fmtWeek(window_.weekStartDate)}
+            </p>
+            <p className="text-white/22 text-xs mb-8">
+              Due {dueDateLabel}
+              {window_.isOverdue && (
+                <span className="text-amber-400 ml-2">· Overdue</span>
+              )}
+            </p>
+            <Link
+              href="/portal/check-ins/new"
+              className="inline-block bg-[#c9a24d] text-black text-[11px] font-bold uppercase tracking-[0.3em] px-8 py-4 hover:bg-[#d4af63] transition-colors"
+            >
+              Start Check-In
+            </Link>
+            {history.length === 0 && (
+              <p className="text-white/20 text-xs leading-relaxed max-w-xs mt-6">
+                Five minutes. Your coach reads every response and adjusts your
+                program around it — week by week, for the entire time you train together.
+              </p>
+            )}
+          </div>
+        ) : currentWeekCheckIn.status === "draft" ? (
+          /* ── DRAFT — almost there ── */
+          <div>
+            <p className="text-[9px] text-white/22 uppercase tracking-[0.45em] mb-4">
+              Check-Ins
+            </p>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-[9px] text-white/28 border border-white/10 px-1.5 py-0.5 uppercase tracking-[0.2em]">
+                Draft saved
+              </span>
+            </div>
+            <h1
+              className="text-white font-bold leading-tight mb-2"
+              style={{ fontSize: "clamp(1.75rem, 5vw, 2.5rem)" }}
+            >
+              Almost there.
+            </h1>
+            <p className="text-white/35 text-sm mb-8">
+              Week of {fmtWeek(window_.weekStartDate)} · Due {dueDateLabel}
+              {window_.isOverdue && (
+                <span className="text-amber-400 ml-2">· Overdue</span>
+              )}
+            </p>
+            <Link
+              href="/portal/check-ins/new"
+              className="inline-block border border-[#c9a24d]/30 text-[#c9a24d] text-[11px] font-bold uppercase tracking-[0.3em] px-8 py-4 hover:bg-[#c9a24d]/10 transition-colors"
+            >
+              Finish Check-In
+            </Link>
+          </div>
+        ) : (
+          /* ── SUBMITTED, WAITING FOR RESPONSE ── */
+          <div>
+            <p className="text-[9px] text-white/22 uppercase tracking-[0.45em] mb-4">
+              Check-Ins
+            </p>
+            <div className="flex items-center gap-2 mb-3">
+              <span
+                className={`text-[9px] border px-1.5 py-0.5 uppercase tracking-[0.2em] ${STATUS_COLOR[currentWeekCheckIn.status]}`}
+              >
+                {STATUS_LABEL[currentWeekCheckIn.status]}
+              </span>
+            </div>
+            <h1
+              className="text-white font-bold leading-tight mb-2"
+              style={{ fontSize: "clamp(1.75rem, 5vw, 2.5rem)" }}
+            >
+              Check-in received.
+            </h1>
+            <p className="text-white/35 text-sm mb-1">
+              Week of {fmtWeek(window_.weekStartDate)}
+            </p>
+            {currentWeekCheckIn.submittedAt && (
+              <p className="text-white/22 text-xs mb-1">
+                Submitted {fmtDate(currentWeekCheckIn.submittedAt)}
+              </p>
+            )}
+            <p className="text-white/18 text-xs mb-8">
+              Next check-in opens {nextCheckInLabel}
+            </p>
+            <div className="flex items-center gap-4">
+              <Link
+                href={`/portal/check-ins/${currentWeekCheckIn.id}`}
+                className="inline-block border border-white/[0.10] text-white/45 hover:text-white hover:border-white/[0.18] text-[10px] font-medium uppercase tracking-[0.2em] px-5 py-2.5 transition-colors"
+              >
+                View Check-In
+              </Link>
+              {currentWeekCheckIn.status === "submitted" && (
+                <Link
+                  href={`/portal/check-ins/${currentWeekCheckIn.id}/edit`}
+                  className="text-[10px] text-white/25 hover:text-white/55 uppercase tracking-[0.2em] transition-colors"
+                >
+                  Edit
+                </Link>
+              )}
+            </div>
           </div>
         )}
-      </div>
+      </section>
+
+      {/* ── HISTORY — secondary, deeply below ── */}
+      {pastCheckIns.length > 0 && (
+        <section aria-label="Check-in history">
+          <p className="text-[9px] text-white/18 uppercase tracking-[0.45em] mb-4">
+            History
+          </p>
+          <div className="divide-y divide-white/[0.04]">
+            {pastCheckIns.map((c) => (
+              <Link
+                key={c.id}
+                href={`/portal/check-ins/${c.id}`}
+                className="flex items-center gap-4 py-3 hover:opacity-75 transition-opacity"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-white/45 text-sm">
+                    Week of {fmtWeek(c.weekStartDate)}
+                  </p>
+                  {c.submittedAt && (
+                    <p className="text-white/20 text-[10px] mt-0.5">
+                      Submitted {fmtDate(c.submittedAt)}
+                    </p>
+                  )}
+                </div>
+                {c.hasCoachResponse && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/50 shrink-0" />
+                )}
+                <span
+                  className={`text-[9px] border px-1.5 py-0.5 uppercase tracking-[0.2em] shrink-0 ${STATUS_COLOR[c.status]}`}
+                >
+                  {STATUS_LABEL[c.status]}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {history.length === 0 && !currentWeekCheckIn && (
+        <div className="border-t border-white/[0.05] pt-8">
+          <p className="text-white/25 text-sm">No check-ins yet.</p>
+          <p className="text-white/15 text-xs mt-1 leading-relaxed">
+            Your history will appear here after your first submission.
+          </p>
+        </div>
+      )}
+
     </PortalShell>
   );
 }

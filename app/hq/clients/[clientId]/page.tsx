@@ -31,6 +31,7 @@ import type {
 import type { ProfileReadiness } from "@/lib/db/profile-readiness";
 import type { HistorySession } from "@/lib/db/workout-session-service";
 import SensitiveHealthPanel from "@/components/hq/workspace/SensitiveHealthPanel";
+import GoalManager from "@/components/hq/workspace/GoalManager";
 
 export const dynamic = "force-dynamic";
 
@@ -583,9 +584,11 @@ function WeightSparkline({ records }: { records: BodyCompSnapshot[] }) {
 function GoalsReadiness({
   goals,
   readiness,
+  clientId,
 }: {
   goals: WorkspaceGoal[];
   readiness: ProfileReadiness;
+  clientId: string;
 }) {
   const sections = [
     { label: "Identity",  level: readiness.sections.identity },
@@ -603,28 +606,7 @@ function GoalsReadiness({
       {/* Goals */}
       <div>
         <p className="text-[9px] text-gray-500 uppercase tracking-[0.3em] mb-2">Active Goals</p>
-        {goals.length === 0 ? (
-          <EmptyState message="No active goals on file." />
-        ) : (
-          <div className="space-y-1.5">
-            {goals.map((g) => (
-              <div key={g.id} className="bg-[#0d0e0f] border border-white/[0.06] px-3 py-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-white text-xs font-medium truncate">{g.description}</p>
-                    <p className="text-gray-500 text-[9px] capitalize">
-                      {g.goalType.replace(/_/g, " ")}
-                      {g.priority !== null && ` · Priority ${g.priority}`}
-                    </p>
-                  </div>
-                  {g.targetDate && (
-                    <p className="text-gray-600 text-[9px] shrink-0">{fmtDate(g.targetDate, true)}</p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <GoalManager goals={goals} clientId={clientId} />
       </div>
 
       {/* Profile readiness */}
@@ -937,7 +919,7 @@ export default async function ClientWorkspacePage({
             prior={workspace.bodyComposition.prior}
             history={workspace.bodyComposition.history}
           />
-          <GoalsReadiness goals={workspace.goals} readiness={workspace.readiness} />
+          <GoalsReadiness goals={workspace.goals} readiness={workspace.readiness} clientId={clientId} />
         </div>
       </div>
 

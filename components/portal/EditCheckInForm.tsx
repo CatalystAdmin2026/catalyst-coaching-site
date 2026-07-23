@@ -256,7 +256,6 @@ function ComplianceSlider({
           step={5}
           value={value ?? 0}
           onChange={(e) => onChange(Number(e.target.value))}
-          onClick={() => { if (value === null) onChange(75); }}
           className="absolute inset-0 w-full opacity-0 cursor-pointer"
           aria-label={label}
         />
